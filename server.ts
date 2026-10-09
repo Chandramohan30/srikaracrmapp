@@ -1,3 +1,4 @@
+import fs from 'fs';
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import crypto from 'crypto';
@@ -283,7 +284,9 @@ async function renderReceipt(paymentId: string): Promise<{ pdf: Buffer; filename
       website: s.website, gstin: s.gstin
     }
   });
-  return { pdf, filename: `${payment.receipt_number}.pdf` };
+  const safeName = String(payment.student_name || 'Student').trim().replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'Student';
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  return { pdf, filename: `${safeName}_${today}.pdf` };
 }
 
 function sendPdf(res: Response, pdf: Buffer, filename: string, inline = false) {
@@ -1256,7 +1259,10 @@ async function startServer() {
   });
 
   // --- VITE MIDDLEWARE / STATIC FILES ---
-  if (process.env.NODE_ENV === 'production') {
+  // Serve the built site whenever it exists, unless started with `npm run dev` (--dev).
+  // (Does not depend on NODE_ENV being set correctly on the host.)
+  const hasBuild = fs.existsSync(path.resolve(__dirname, 'dist', 'index.html'));
+  if (process.env.NODE_ENV === 'production' || (hasBuild && !process.argv.includes('--dev'))) {
     app.use(express.static(path.resolve(__dirname, 'dist')));
     app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
@@ -1265,7 +1271,7 @@ async function startServer() {
     try {
       const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({
-        server: { middlewareMode: true },
+        server: { middlewareMode: true, allowedHosts: true },
         appType: 'spa',
       });
       app.use(vite.middlewares);

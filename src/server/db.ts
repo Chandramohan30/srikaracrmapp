@@ -53,8 +53,13 @@ export async function connectMongoDB(): Promise<MongoStatus> {
     // Create empty collections + indexes (NO sample data is inserted)
     await ensureCollections();
 
-    // Make sure at least one admin login exists
-    await ensureAdminUser();
+    // Make sure at least one admin login exists.
+    // A problem here must NOT take the whole database connection down.
+    try {
+      await ensureAdminUser();
+    } catch (e: any) {
+      console.warn('[MongoDB Atlas] Could not create / sync the admin login:', e.message);
+    }
 
     return {
       status: 'connected',
@@ -133,34 +138,27 @@ export async function ensureCollections() {
  * Override with ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_NAME in .env
  */
 export async function ensureAdminUser() {
-  const email = (process.env.ADMIN_EMAIL || 's').toLowerCase().trim();
-  const password = process.env.ADMIN_PASSWORD || '';
-  const name = process.env.ADMIN_NAME || 'Academy Admin';
-
-  const existing: any = await UserModel.findOne({ email }).select('+password_hash');
-
-  if (!existing) {
-    await UserModel.create({
-      id: 'usr-admin-1',
-      name,
-      email,
-      phone: '',
-      role: 'admin',
-      status: 'active',
-      password_hash: await hashPassword(password)
-    });
-    console.log(`[MongoDB Atlas] Admin login created -> ${email}`);
+  // An admin already exists in MongoDB -> use it. Never create another one and
+  // never change its email / password.
+  const adminExists = await UserModel.exists({ role: 'admin' });
+  if (adminExists) {
+    console.log('[MongoDB Atlas] Existing admin found - using it (no admin created).');
     return;
   }
 
-  // Repair / sync: make sure this admin can sign in with ADMIN_PASSWORD from .env
-  if (existing.role === 'admin') {
-    const ok = await verifyPassword(password, existing.password_hash);
-    if (!ok || existing.status !== 'active') {
-      existing.password_hash = await hashPassword(password);
-      existing.status = 'active';
-      await existing.save();
-      console.log(`[MongoDB Atlas] Admin password synced from .env -> ${email}`);
-    }
-  }
+  // Fresh database with no admin at all: create the first one from ADMIN_* settings
+  const email = (process.env.ADMIN_EMAIL || 'admin@srikaraacademy.com').toLowerCase().trim();
+  const password = process.env.ADMIN_PASSWORD || 'Admin@123';
+  const name = process.env.ADMIN_NAME || 'Academy Admin';
+
+  await UserModel.create({
+    id: 'usr-admin-1',
+    name,
+    email,
+    phone: '',
+    role: 'admin',
+    status: 'active',
+    password_hash: await hashPassword(password)
+  });
+  console.log(`[MongoDB Atlas] First admin login created -> ${email}`);
 }
