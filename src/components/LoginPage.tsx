@@ -23,8 +23,8 @@ const defaultCredentials: Record<UserRole, { email: string; password: string; na
     desc: 'Manage schedules & view assigned students'
   },
   admin: {
-    email: 'admin@srikaraacademy.com',
-    password: 'Admin@123',
+    email: '',
+    password: '',
     name: 'Academy Admin',
     desc: 'Full academy control, fee master & settings'
   }
@@ -93,7 +93,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl">
           <div className="mb-5 text-center">
             <h2 className="text-base font-bold text-white tracking-wide">
-              Sign In to CRM Portal
+              Sign Ins
             </h2>
             <p className="text-xs text-slate-400 mt-1">
               Select your role and enter credentials to continue

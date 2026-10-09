@@ -133,8 +133,8 @@ export async function ensureCollections() {
  * Override with ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_NAME in .env
  */
 export async function ensureAdminUser() {
-  const email = (process.env.ADMIN_EMAIL || 'admin@srikaraacademy.com').toLowerCase().trim();
-  const password = process.env.ADMIN_PASSWORD || 'Admin@123';
+  const email = (process.env.ADMIN_EMAIL || 's').toLowerCase().trim();
+  const password = process.env.ADMIN_PASSWORD || '';
   const name = process.env.ADMIN_NAME || 'Academy Admin';
 
   const existing: any = await UserModel.findOne({ email }).select('+password_hash');
