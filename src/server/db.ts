@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { 
   UserModel, CourseModel, TrainerModel, StudentModel, 
   InstallmentModel, PaymentModel, LeaveModel, ScheduleModel, 
-  SettingsModel, AuditLogModel, CounterModel, RefreshTokenModel
+  SettingsModel, AuditLogModel, CounterModel, RefreshTokenModel, FollowUpModel
 } from './models.js';
 import { hashPassword, verifyPassword } from './auth.js';
 
@@ -113,7 +113,7 @@ export async function ensureCollections() {
   const models: any[] = [
     UserModel, CourseModel, TrainerModel, StudentModel,
     InstallmentModel, PaymentModel, LeaveModel, ScheduleModel,
-    SettingsModel, AuditLogModel, CounterModel, RefreshTokenModel
+    SettingsModel, AuditLogModel, CounterModel, RefreshTokenModel, FollowUpModel
   ];
   for (const m of models) {
     try {

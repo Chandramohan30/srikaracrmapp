@@ -17,6 +17,8 @@ import {
 } from './src/server/auth.js';
 import { buildReceiptPdf } from './src/server/receipt.js';
 import { ACADEMY_UPI_ID } from './src/server/config.js';
+import { startFollowUpScheduler, startFollowUp, syncFollowUpWithStudent } from './src/server/followups.js';
+import { registerAgentRoutes } from './src/server/agentRoutes.js';
 import {
   round2, getMonthNamesFromDate, splitAmountIntoTwoInstallments, computeInstallmentStatus,
   getActualDue, getPayableNow, getDisplayDue
@@ -78,7 +80,7 @@ async function nextCode(
     const c: any = await CounterModel.findOneAndUpdate(
       { key: counterKey },
       { $inc: { seq: 1 } },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
     const code = build(c.seq);
     if (!(await exists(code))) return code;
@@ -90,7 +92,7 @@ async function nextSeq(counterKey: string): Promise<number> {
   const c: any = await CounterModel.findOneAndUpdate(
     { key: counterKey },
     { $inc: { seq: 1 } },
-    { new: true, upsert: true }
+    { returnDocument: 'after', upsert: true }
   );
   return c.seq;
 }
@@ -354,6 +356,10 @@ async function startServer() {
     }
     next();
   });
+
+  // --- AI AGENT API (x-agent-key protected) + WhatsApp follow-up scheduler ---
+  registerAgentRoutes(app, { HttpError, wrap, logAudit });
+  startFollowUpScheduler();
 
   // --- AUTHENTICATION ---
   app.post('/api/auth/login', wrap(async (req, res) => {
@@ -720,6 +726,8 @@ async function startServer() {
       await recalcTrainer(trainer.id);
 
       const fresh = await StudentModel.findOne({ id: studentId });
+      // New student -> start the WhatsApp follow-up scheduler (never blocks onboarding)
+      startFollowUp(fresh).catch(e => console.warn('[FollowUp] could not start:', e.message));
       res.status(201).json({
         student: clean(fresh),
         installments: cleanAll(installments)
@@ -767,7 +775,7 @@ async function startServer() {
       name: student.full_name,
       email: student.email,
       phone: student.phone,
-      status: ['dropped', 'cancelled'].includes(student.status) ? 'inactive' : 'active'
+      status: ['dropped', 'cancelled', 'inactive'].includes(student.status) ? 'inactive' : 'active'
     });
 
     if (updates.first_name || updates.last_name) {
@@ -781,7 +789,11 @@ async function startServer() {
     await recalcTrainer(oldTrainerId);
     await recalcTrainer(student.trainer_id);
 
-    res.json(clean(await StudentModel.findOne({ id: student.id })));
+    // Status / phone changed -> stop (inactive, dropped...) or resume the WhatsApp scheduler
+    const updated = await StudentModel.findOne({ id: student.id });
+    await syncFollowUpWithStudent(updated).catch(e => console.warn('[FollowUp] sync failed:', e.message));
+
+    res.json(clean(updated));
   }));
 
   // --- INSTALLMENTS ---
@@ -1223,6 +1235,112 @@ async function startServer() {
     if (!settings) settings = await SettingsModel.create({ id: 'default_settings' });
     res.json(clean(settings));
   }));
+
+
+  
+app.post('/api/chat', authenticate, allow('admin'), wrap(async (req, res) => {
+  const message =
+    typeof req.body?.message === 'string'
+      ? req.body.message.trim()
+      : '';
+
+  const thread_id =
+    typeof req.body?.thread_id === 'string'
+      ? req.body.thread_id
+      : undefined;
+
+  if (!message) {
+    throw new HttpError(400, 'Please type a message.');
+  }
+
+  if (message.length > 2000) {
+    throw new HttpError(400, 'Message is too long (max 2000 characters).');
+  }
+
+  // Use a normal URL, not a Markdown link.
+  const agentBase = (process.env.AGENT_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+
+  let agentRes: globalThis.Response;
+
+  try {
+    agentRes = await fetch(`${agentBase}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message,
+        thread_id
+      }),
+      signal: controller.signal
+    });
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new HttpError(
+        504,
+        'The AI assistant took too long to answer. Please try again.'
+      );
+    }
+
+    throw new HttpError(
+      502,
+      'The AI assistant is not reachable right now. Make sure the agent server is running.'
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const raw = await agentRes.text();
+
+  if (!agentRes.ok) {
+    console.error(`[AI agent] ${agentRes.status}: ${raw.slice(0, 300)}`);
+    throw new HttpError(
+      502,
+      'The AI assistant returned an error. Please try again.'
+    );
+  }
+
+  let reply = raw;
+  let returnedThreadId: string | undefined;
+
+  try {
+    const data = JSON.parse(raw);
+
+    if (typeof data === 'string') {
+      reply = data;
+    } else if (data && typeof data === 'object') {
+      // Read the thread ID generated by FastAPI.
+      if (typeof data.thread_id === 'string') {
+        returnedThreadId = data.thread_id;
+      }
+
+      // Read the assistant's answer.
+      const key = [
+        'reply',
+        'response',
+        'answer',
+        'message',
+        'output',
+        'text',
+        'result'
+      ].find(k => typeof data[k] === 'string');
+
+      reply = key ? data[key] : JSON.stringify(data, null, 2);
+    }
+  } catch {
+    // If the response is not JSON, use the raw text.
+  }
+
+  res.json({
+    reply: String(reply).trim() || 'The assistant returned an empty answer.',
+    thread_id: returnedThreadId
+  });
+}));
+
+
 
   app.put('/api/settings', authenticate, allow('admin'), wrap(async (req, res) => {
     let settings: any = await SettingsModel.findOne({ id: 'default_settings' });

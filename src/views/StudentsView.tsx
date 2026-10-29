@@ -178,6 +178,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
           >
             <option value="all">All Student Statuses</option>
             <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
             <option value="completed">Completed</option>
             <option value="on_hold">On Hold</option>
             <option value="dropped">Dropped</option>
@@ -566,6 +567,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                   className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
                 >
                   <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
                   <option value="completed">Completed</option>
                   <option value="on_hold">On Hold</option>
                   <option value="dropped">Dropped</option>

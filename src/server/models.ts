@@ -112,7 +112,7 @@ export interface IStudent extends Document {
   trainer_name: string;
   joining_date: string;
   expected_completion_date: string;
-  status: 'lead' | 'onboarding' | 'active' | 'on_hold' | 'completed' | 'dropped' | 'cancelled';
+  status: 'lead' | 'onboarding' | 'active' | 'inactive' | 'on_hold' | 'completed' | 'dropped' | 'cancelled';
   payment_status: 'not_paid' | 'partially_paid' | 'paid' | 'has_due' | 'fully_paid';
   total_course_amount: number;
   total_paid: number;
@@ -148,7 +148,7 @@ export const StudentSchema = new Schema<IStudent>({
   status: { 
     type: String, 
     default: 'active', 
-    enum: ['lead', 'onboarding', 'active', 'on_hold', 'completed', 'dropped', 'cancelled'] 
+    enum: ['lead', 'onboarding', 'active', 'inactive', 'on_hold', 'completed', 'dropped', 'cancelled'] 
   },
   payment_status: { 
     type: String, 
@@ -436,6 +436,38 @@ export const RefreshTokenSchema = new Schema<IRefreshToken>({
 // MongoDB removes expired documents automatically
 RefreshTokenSchema.index({ expires_at: 1 }, { expireAfterSeconds: 0 });
 
+
+// 13. WhatsApp follow-up state (one row per student)
+export interface IFollowUp extends Document {
+  id: string;
+  student_id: string;
+  student_name: string;
+  phone: string;
+  active: boolean;
+  messages_sent: number;
+  last_sent_at?: Date;
+  next_run_at: Date;
+  stopped_reason?: string;
+  stopped_at?: Date;
+  history: { at: Date; text: string; source: 'scheduler' | 'agent'; ok: boolean; error?: string }[];
+}
+
+export const FollowUpSchema = new Schema<IFollowUp>({
+  id: { type: String, required: true, unique: true },
+  student_id: { type: String, required: true, unique: true },
+  student_name: { type: String, default: '' },
+  phone: { type: String, default: '' },
+  active: { type: Boolean, default: true, index: true },
+  messages_sent: { type: Number, default: 0 },
+  last_sent_at: { type: Date },
+  next_run_at: { type: Date, default: Date.now, index: true },
+  stopped_reason: { type: String },
+  stopped_at: { type: Date },
+  history: { type: [new Schema({
+    at: Date, text: String, source: String, ok: Boolean, error: String
+  }, { _id: false })], default: [] }
+}, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
+
 // Export Models
 export const UserModel = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
 export const CourseModel = mongoose.models.Course || mongoose.model<ICourse>('Course', CourseSchema);
@@ -450,3 +482,4 @@ export const SettingsModel = mongoose.models.Settings || mongoose.model<ISetting
 
 export const RefreshTokenModel = mongoose.models.RefreshToken || mongoose.model<IRefreshToken>('RefreshToken', RefreshTokenSchema);
 export const CounterModel = mongoose.models.Counter || mongoose.model<ICounter>('Counter', CounterSchema);
+export const FollowUpModel = mongoose.models.FollowUp || mongoose.model<IFollowUp>('FollowUp', FollowUpSchema);

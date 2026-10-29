@@ -17,6 +17,7 @@ import { StudentProfileView } from './views/StudentProfileView';
 import { StudentOnboardingModal } from './components/StudentOnboardingModal';
 import { LoginPage } from './components/LoginPage';
 import { db } from './services/db';
+import { ChatBot } from './components/ChatBot';
 
 const AppContent: React.FC = () => {
   const { currentUser, isAdmin, isTrainer, isStudent, isAuthenticated, isLoading } = useAuth();
@@ -141,6 +142,10 @@ const AppContent: React.FC = () => {
           </div>
         </main>
       </div>
+
+
+       {/* AI assistant: floating icon (bottom-right) that opens the chat window */}
+      {currentUser?.role === 'admin' && <ChatBot />}
 
       {/* Global Student Onboarding Modal (5-Step Wizard) */}
       {isOnboardModalOpen && (

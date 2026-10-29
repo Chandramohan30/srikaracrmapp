@@ -47,6 +47,7 @@ export type StudentStatus =
   | 'lead' 
   | 'onboarding' 
   | 'active' 
+  | 'inactive' 
   | 'on_hold' 
   | 'completed' 
   | 'dropped' 

@@ -110,6 +110,12 @@ export const StudentStatusBadge: React.FC<{ status: StudentStatus }> = ({ status
           On Hold
         </span>
       );
+    case 'inactive':
+      return (
+        <span className="inline-flex items-center text-xs font-medium text-slate-600 bg-slate-100 border border-slate-300 rounded px-2.5 py-0.5">
+          Inactive
+        </span>
+      );
     case 'dropped':
       return (
         <span className="inline-flex items-center text-xs font-medium text-red-800 bg-red-50 border border-red-200 rounded px-2.5 py-0.5">
