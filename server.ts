@@ -8,7 +8,7 @@ import { connectMongoDB, getMongoStatus } from './src/server/db.js';
 import {
   UserModel, CourseModel, TrainerModel, StudentModel,
   InstallmentModel, PaymentModel, LeaveModel, ScheduleModel,
-  SettingsModel, AuditLogModel, CounterModel, RefreshTokenModel
+  SettingsModel, AuditLogModel, CounterModel, RefreshTokenModel, DepartmentModel, FollowUpModel
 } from './src/server/models.js';
 import {
   hashPassword, verifyPassword, sha256,
@@ -357,6 +357,21 @@ async function startServer() {
     next();
   });
 
+  // One-off backfill: students created before departments existed follow their course's department
+  if (mongoStatus && getMongoStatus().status === 'connected') {
+    try {
+      const courses: any[] = await CourseModel.find({ department_id: { $nin: ['', null] } }).lean();
+      for (const c of courses) {
+        await StudentModel.updateMany(
+          { course_id: c.id, $or: [{ department_id: { $in: ['', null] } }, { department_id: { $exists: false } }] },
+          { department_id: c.department_id, department_name: c.department_name }
+        );
+      }
+    } catch (e: any) {
+      console.warn('[Departments] backfill skipped:', e.message);
+    }
+  }
+
   // --- AI AGENT API (x-agent-key protected) + WhatsApp follow-up scheduler ---
   registerAgentRoutes(app, { HttpError, wrap, logAudit });
   startFollowUpScheduler();
@@ -455,6 +470,7 @@ async function startServer() {
     }
 
     const sort = { created_at: -1 } as any;
+    const departments = await DepartmentModel.find().sort({ name: 1 }).lean();
     const courses = await CourseModel.find().sort(sort).lean();
     const trainers = await TrainerModel.find().sort(sort).lean();
 
@@ -487,6 +503,7 @@ async function startServer() {
 
     res.json({
       users: [clean(user)],
+      departments: cleanAll(departments),
       courses: cleanAll(courses),
       trainers: cleanAll(trainers),
       students: cleanAll(students),
@@ -497,6 +514,56 @@ async function startServer() {
       auditLogs: cleanAll(auditLogs),
       settings: clean(settings)
     });
+  }));
+
+  // --- DEPARTMENTS ---
+  const resolveDepartment = async (id?: string) => {
+    if (!id) return { department_id: '', department_name: '' };
+    const dept: any = await DepartmentModel.findOne({ id });
+    if (!dept) throw new HttpError(404, 'Department not found');
+    return { department_id: dept.id, department_name: dept.name };
+  };
+
+  app.post('/api/departments', authenticate, allow('admin'), wrap(async (req, res) => {
+    required(req.body, ['name']);
+    const name = String(req.body.name).trim();
+    if (await DepartmentModel.findOne({ name }).collation({ locale: 'en', strength: 2 })) {
+      throw new HttpError(409, `Department "${name}" already exists.`);
+    }
+    let code = String(req.body.code || '').trim().toUpperCase();
+    if (!code) code = name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'DEPT';
+    if (await DepartmentModel.findOne({ code })) code = `${code}-${shortId().slice(0, 3).toUpperCase()}`;
+    const dept = await DepartmentModel.create({
+      id: `dep-${shortId()}`,
+      code,
+      name,
+      description: req.body.description || '',
+      status: req.body.status || 'active'
+    });
+    await logAudit(req.user, 'CREATE_DEPARTMENT', 'Department', dept.id, undefined, `Created department: ${dept.name}`);
+    res.status(201).json(clean(dept));
+  }));
+
+  app.put('/api/departments/:id', authenticate, allow('admin'), wrap(async (req, res) => {
+    const dept: any = await DepartmentModel.findOne({ id: req.params.id });
+    if (!dept) throw new HttpError(404, 'Department not found');
+    const oldName = dept.name;
+    const updates = pick(req.body, ['name', 'description', 'status']);
+    if (updates.name) {
+      updates.name = String(updates.name).trim();
+      const clash = await DepartmentModel.findOne({ name: updates.name, id: { $ne: dept.id } });
+      if (clash) throw new HttpError(409, `Department "${updates.name}" already exists.`);
+    }
+    Object.assign(dept, updates);
+    await dept.save();
+    if (dept.name !== oldName) {
+      // keep the denormalised names in sync
+      await CourseModel.updateMany({ department_id: dept.id }, { department_name: dept.name });
+      await TrainerModel.updateMany({ department_id: dept.id }, { department_name: dept.name });
+      await StudentModel.updateMany({ department_id: dept.id }, { department_name: dept.name });
+    }
+    await logAudit(req.user, 'UPDATE_DEPARTMENT', 'Department', dept.id, oldName, `Department: ${dept.name} (${dept.status})`);
+    res.json(clean(dept));
   }));
 
   // --- COURSES ---
@@ -512,6 +579,7 @@ async function startServer() {
       description: req.body.description || '',
       duration: req.body.duration,
       base_price,
+      ...(await resolveDepartment(req.body.department_id)),
       status: req.body.status || 'active'
     });
     await logAudit(req.user, 'CREATE_COURSE', 'Course', course.id, undefined,
@@ -526,7 +594,12 @@ async function startServer() {
     const updates = pick(req.body, ['course_name', 'base_price', 'duration', 'description', 'status']);
     if (updates.base_price !== undefined) updates.base_price = Number(updates.base_price);
     Object.assign(course, updates);
+    if (req.body.department_id !== undefined) Object.assign(course, await resolveDepartment(req.body.department_id));
     await course.save();
+    if (req.body.department_id !== undefined) {
+      // students enrolled in this course follow the course's department
+      await StudentModel.updateMany({ course_id: course.id }, { department_id: course.department_id, department_name: course.department_name });
+    }
     await logAudit(req.user, 'UPDATE_COURSE', 'Course', course.id, oldVal,
       `Price: ₹${course.base_price}, Status: ${course.status}`);
     res.json(clean(course));
@@ -578,6 +651,7 @@ async function startServer() {
         email,
         phone: req.body.phone || '',
         specialization: req.body.specialization || '',
+        ...(await resolveDepartment(req.body.department_id)),
         experience: req.body.experience || '',
         joining_date: req.body.joining_date || '',
         status,
@@ -608,6 +682,7 @@ async function startServer() {
       if (clash) throw new HttpError(409, `A user with email ${updates.email} already exists.`);
     }
     Object.assign(trainer, updates);
+    if (req.body.department_id !== undefined) Object.assign(trainer, await resolveDepartment(req.body.department_id));
     await trainer.save();
 
     const userUpdates: any = {};
@@ -631,6 +706,18 @@ async function startServer() {
     if (!course) throw new HttpError(404, 'Course not found');
     const trainer: any = await TrainerModel.findOne({ id: d.trainer_id });
     if (!trainer) throw new HttpError(404, 'Trainer not found');
+
+    // Department: chosen on the form, otherwise inherited from the course / trainer
+    const deptId = d.department_id || course.department_id || trainer.department_id || '';
+    if (d.department_id) {
+      if (course.department_id && course.department_id !== d.department_id) {
+        throw new HttpError(400, 'Selected course does not belong to the chosen department.');
+      }
+      if (trainer.department_id && trainer.department_id !== d.department_id) {
+        throw new HttpError(400, 'Selected trainer does not belong to the chosen department.');
+      }
+    }
+    const dept = await resolveDepartment(deptId);
 
     const email = String(d.email).toLowerCase().trim();
     if (await UserModel.findOne({ email })) {
@@ -686,6 +773,7 @@ async function startServer() {
         qualification: d.qualification || '',
         college: d.college,
         passing_year: d.passing_year,
+        ...dept,
         course_id: course.id,
         course_name: course.course_name,
         trainer_id: trainer.id,
@@ -767,6 +855,7 @@ async function startServer() {
     }
 
     Object.assign(student, updates);
+    if (req.body.department_id !== undefined) Object.assign(student, await resolveDepartment(req.body.department_id));
     student.full_name = `${student.first_name} ${student.last_name}`.trim();
     await student.save();
 
@@ -1226,6 +1315,91 @@ async function startServer() {
     const schedule = await loadOwnedSchedule(req);
     await ScheduleModel.deleteOne({ id: schedule.id });
     await logAudit(req.user, 'DELETE_SCHEDULE', 'ClassSchedule', schedule.id, schedule.title, 'DELETED');
+    res.json({ success: true });
+  }));
+
+  // --- DELETE (admin only) ---
+  app.delete('/api/payments/:id', authenticate, allow('admin'), wrap(async (req, res) => {
+    const payment: any = await PaymentModel.findOne({ id: req.params.id });
+    if (!payment) throw new HttpError(404, 'Payment not found');
+    await PaymentModel.deleteOne({ id: payment.id });
+    await recalcStudent(payment.student_id);
+    await logAudit(req.user, 'DELETE_PAYMENT', 'Payment', payment.id,
+      `${payment.receipt_number} ₹${payment.amount} (${payment.student_name})`, 'DELETED');
+    res.json({ success: true });
+  }));
+
+  app.delete('/api/installments/:id', authenticate, allow('admin'), wrap(async (req, res) => {
+    const inst: any = await InstallmentModel.findOne({ id: req.params.id });
+    if (!inst) throw new HttpError(404, 'Installment not found');
+    const subs: any[] = await InstallmentModel.find({ parent_installment_id: inst.id });
+    const ids = [inst.id, ...subs.map(x => x.id)];
+    const paid = await PaymentModel.countDocuments({ installment_id: { $in: ids } });
+    if (paid > 0) {
+      throw new HttpError(409, `This installment has ${paid} payment(s). Delete those payments first.`);
+    }
+    await InstallmentModel.deleteMany({ id: { $in: ids } });
+    await recalcStudent(inst.student_id);
+    await logAudit(req.user, 'DELETE_INSTALLMENT', 'Installment', inst.id,
+      `${inst.name || 'Installment ' + inst.installment_number} ₹${inst.installment_amount} (${inst.student_name})`, 'DELETED');
+    res.json({ success: true });
+  }));
+
+  app.delete('/api/students/:id', authenticate, allow('admin'), wrap(async (req, res) => {
+    const student: any = await StudentModel.findOne({ id: req.params.id });
+    if (!student) throw new HttpError(404, 'Student not found');
+    // everything that belongs to the student goes with it
+    await PaymentModel.deleteMany({ student_id: student.id });
+    await InstallmentModel.deleteMany({ student_id: student.id });
+    await LeaveModel.deleteMany({ student_id: student.id });
+    await ScheduleModel.deleteMany({ student_id: student.id });
+    await FollowUpModel.deleteMany({ student_id: student.id });
+    await UserModel.deleteOne({ id: student.user_id });
+    await RefreshTokenModel.deleteMany({ user_id: student.user_id });
+    await StudentModel.deleteOne({ id: student.id });
+    await recalcTrainer(student.trainer_id);
+    await logAudit(req.user, 'DELETE_STUDENT', 'Student', student.id,
+      `${student.full_name} (${student.student_code})`, 'DELETED');
+    res.json({ success: true });
+  }));
+
+  app.delete('/api/trainers/:id', authenticate, allow('admin'), wrap(async (req, res) => {
+    const trainer: any = await TrainerModel.findOne({ id: req.params.id });
+    if (!trainer) throw new HttpError(404, 'Trainer not found');
+    const n = await StudentModel.countDocuments({ trainer_id: trainer.id });
+    if (n > 0) throw new HttpError(409, `${n} student(s) are assigned to this trainer. Reassign or delete them first.`);
+    await ScheduleModel.deleteMany({ trainer_id: trainer.id });
+    await UserModel.deleteOne({ id: trainer.user_id });
+    await RefreshTokenModel.deleteMany({ user_id: trainer.user_id });
+    await TrainerModel.deleteOne({ id: trainer.id });
+    await logAudit(req.user, 'DELETE_TRAINER', 'Trainer', trainer.id,
+      `${trainer.name} (${trainer.trainer_code})`, 'DELETED');
+    res.json({ success: true });
+  }));
+
+  app.delete('/api/courses/:id', authenticate, allow('admin'), wrap(async (req, res) => {
+    const course: any = await CourseModel.findOne({ id: req.params.id });
+    if (!course) throw new HttpError(404, 'Course not found');
+    const n = await StudentModel.countDocuments({ course_id: course.id });
+    if (n > 0) throw new HttpError(409, `${n} student(s) are enrolled in this course. Delete or move them first.`);
+    await CourseModel.deleteOne({ id: course.id });
+    await logAudit(req.user, 'DELETE_COURSE', 'Course', course.id, course.course_name, 'DELETED');
+    res.json({ success: true });
+  }));
+
+  app.delete('/api/departments/:id', authenticate, allow('admin'), wrap(async (req, res) => {
+    const dept: any = await DepartmentModel.findOne({ id: req.params.id });
+    if (!dept) throw new HttpError(404, 'Department not found');
+    const [c, t, st] = await Promise.all([
+      CourseModel.countDocuments({ department_id: dept.id }),
+      TrainerModel.countDocuments({ department_id: dept.id }),
+      StudentModel.countDocuments({ department_id: dept.id })
+    ]);
+    if (c + t + st > 0) {
+      throw new HttpError(409, `Department is in use (${c} course(s), ${t} trainer(s), ${st} student(s)). Move or delete them first.`);
+    }
+    await DepartmentModel.deleteOne({ id: dept.id });
+    await logAudit(req.user, 'DELETE_DEPARTMENT', 'Department', dept.id, dept.name, 'DELETED');
     res.json({ success: true });
   }));
 

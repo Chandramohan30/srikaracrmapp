@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   CreditCard, Search, Filter, FileText, Download, Eye, 
-  CheckCircle, ArrowUpRight, X, Calendar, Lock 
+  CheckCircle, ArrowUpRight, X, Calendar, Lock, Trash2 
 } from 'lucide-react';
 import { Payment, Installment, Student } from '../types/crm';
 import { db } from '../services/db';
@@ -269,6 +269,16 @@ export const PaymentsView: React.FC = () => {
                         >
                           <FileText className="w-3.5 h-3.5" />
                           Receipt
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Delete payment ${p.receipt_number} of ₹${p.amount} for ${p.student_name}? The student's paid/outstanding amounts will be recalculated.`)) return;
+                            try { await db.deletePayment(p.id); reloadData(); } catch (err: any) { alert(err.message); }
+                          }}
+                          title="Delete payment"
+                          className="inline-flex items-center ml-1.5 p-1.5 text-red-600 hover:text-white hover:bg-red-600 border border-red-200 rounded transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </td>
                     )}

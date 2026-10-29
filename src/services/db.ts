@@ -1,7 +1,7 @@
 import { 
   User, Course, Trainer, Student, Installment, Payment, 
   LeaveApplication, ClassSchedule, AuditLog, ManualInstallmentInput,
-  UserRole
+  UserRole, Department
 } from '../types/crm';
 import { getMonthNamesFromDate, splitAmountIntoTwoInstallments } from '../server/finance';
 
@@ -144,6 +144,7 @@ interface Settings {
 }
 
 interface DatabaseState {
+  departments: Department[];
   users: User[];
   courses: Course[];
   trainers: Trainer[];
@@ -158,6 +159,7 @@ interface DatabaseState {
 
 function emptyState(): DatabaseState {
   return {
+    departments: [],
     users: [],
     courses: [],
     trainers: [],
@@ -191,6 +193,7 @@ class DatabaseService {
     const data = await api<Partial<DatabaseState>>('GET', '/api/bootstrap');
     const empty = emptyState();
     this.state = {
+      departments: data.departments || [],
       users: data.users || [],
       courses: data.courses || [],
       trainers: data.trainers || [],
@@ -215,6 +218,27 @@ class DatabaseService {
 
   public getUserById(id: string): User | undefined {
     return this.state.users.find(u => u.id === id);
+  }
+
+  // --- DEPARTMENTS ---
+  public getDepartments(): Department[] {
+    return this.state.departments;
+  }
+
+  public getDepartmentById(id: string): Department | undefined {
+    return this.state.departments.find(d => d.id === id);
+  }
+
+  public async createDepartment(data: { name: string; code?: string; description?: string; status?: 'active' | 'inactive' }, _actor?: User): Promise<Department> {
+    const dept = await api<Department>('POST', '/api/departments', data);
+    await this.load();
+    return dept;
+  }
+
+  public async updateDepartment(id: string, updates: Partial<Department>, _actor?: User): Promise<Department> {
+    const dept = await api<Department>('PUT', `/api/departments/${id}`, updates);
+    await this.load();
+    return dept;
   }
 
   // --- COURSES ---
@@ -295,6 +319,7 @@ class DatabaseService {
     qualification: string;
     college?: string;
     passing_year?: string;
+    department_id?: string;
     course_id: string;
     trainer_id: string;
     joining_date: string;
@@ -457,58 +482,139 @@ class DatabaseService {
     await this.load();
   }
 
+  // --- DELETE (admin only; server enforces it) ---
+  private async remove(url: string): Promise<void> {
+    await api('DELETE', url);
+    await this.load();
+  }
+  public deletePayment(id: string) { return this.remove(`/api/payments/${id}`); }
+  public deleteInstallment(id: string) { return this.remove(`/api/installments/${id}`); }
+  public deleteStudent(id: string) { return this.remove(`/api/students/${id}`); }
+  public deleteTrainer(id: string) { return this.remove(`/api/trainers/${id}`); }
+  public deleteCourse(id: string) { return this.remove(`/api/courses/${id}`); }
+  public deleteDepartment(id: string) { return this.remove(`/api/departments/${id}`); }
+
   // --- AUDIT LOGS ---
   public getAuditLogs(): AuditLog[] {
     return this.state.auditLogs;
   }
 
   // --- KPI & DASHBOARD METRICS ---
-  public getDashboardMetrics() {
-    const students = this.state.students;
-    const payments = this.state.payments.filter(p => p.payment_status === 'success');
-    const installments = this.state.installments;
-    const leaves = this.state.leaves;
+  /**
+   * Dashboard numbers, optionally narrowed by department and/or period.
+   *  - department: '' / 'all' = every department
+   *  - year: 0 = all years
+   *  - month: 0 = whole year (1-12 = that month); only used together with a year
+   * Students are matched by their joining date, payments by payment date,
+   * installments by due date. With no filters everything is counted.
+   */
+  public getDashboardMetrics(filters: { department?: string; year?: number; month?: number } = {}) {
+    const deptId = filters.department && filters.department !== 'all' ? filters.department : '';
+    const year = filters.year || 0;
+    const month = year ? (filters.month || 0) : 0;
+
+    const inPeriod = (dateStr: string | undefined): boolean => {
+      if (!year) return true;
+      if (!dateStr) return false;
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return false;
+      if (d.getFullYear() !== year) return false;
+      return !month || d.getMonth() + 1 === month;
+    };
+
+    const allStudents = this.state.students;
+    const deptStudents = deptId ? allStudents.filter(s => s.department_id === deptId) : allStudents;
+    const deptStudentIds = new Set(deptStudents.map(s => s.id));
+
+    // Students who joined in the period (drives enrolment / revenue / status cards)
+    const students = deptStudents.filter(s => inPeriod(s.joining_date));
+
+    // Money actually received in the period for this department
+    const payments = this.state.payments.filter(p =>
+      p.payment_status === 'success' && deptStudentIds.has(p.student_id) && inPeriod(p.payment_date)
+    );
+
+    // Installments that fall due in the period for this department
+    const installments = this.state.installments.filter(i =>
+      deptStudentIds.has(i.student_id) && inPeriod(i.due_date)
+    );
+
+    const leaves = this.state.leaves.filter(l => deptStudentIds.has(l.student_id));
+    const trainers = deptId
+      ? this.state.trainers.filter(t => t.department_id === deptId)
+      : this.state.trainers;
 
     const totalStudents = students.length;
     const activeStudents = students.filter(s => s.status === 'active').length;
     const completedStudents = students.filter(s => s.status === 'completed').length;
-    const totalTrainers = this.state.trainers.length;
+    const onHoldStudents = students.filter(s => s.status === 'on_hold').length;
+    const droppedStudents = students.filter(s => s.status === 'dropped' || s.status === 'cancelled').length;
+    const totalTrainers = trainers.length;
 
-    const totalRevenue = students.reduce((sum, s) => sum + s.total_course_amount, 0);
     const amountCollected = payments.reduce((sum, p) => sum + p.amount, 0);
-    const totalOutstanding = Math.max(0, totalRevenue - amountCollected);
+
+    let totalRevenue: number;
+    let totalOutstanding: number;
+    if (!year) {
+      // No period selected: whole-life numbers for the department (or everything)
+      totalRevenue = students.reduce((sum, s) => sum + s.total_course_amount, 0);
+      totalOutstanding = Math.max(0, totalRevenue - amountCollected);
+    } else {
+      // Period selected: billed = installments due in the period, outstanding = what is still unpaid on them
+      totalRevenue = installments.reduce((sum, i) => sum + i.installment_amount, 0);
+      totalOutstanding = installments.reduce((sum, i) => sum + Math.max(0, i.installment_amount - i.paid_amount), 0);
+    }
 
     const partialPaymentsCount = students.filter(s => s.payment_status === 'partially_paid').length;
-    
-    const studentsWithDuesCount = students.filter(s => {
-      const insts = installments.filter(i => i.student_id === s.id);
-      return insts.some(i => i.due_amount > 0);
-    }).length;
+
+    const studentsWithDuesCount = students.filter(s =>
+      this.state.installments.some(i => i.student_id === s.id && i.due_amount > 0 && (!year || inPeriod(i.due_date)))
+    ).length;
 
     const pendingLeaveRequests = leaves.filter(l => l.status === 'pending').length;
 
-    const fullStackCount = students.filter(s => s.course_name.toLowerCase().includes('full stack')).length;
-    const aimlCount = students.filter(s => s.course_name.toLowerCase().includes('ai')).length;
+    // Per-course enrolment inside the selected department / period
+    const courseMap = new Map<string, { id: string; name: string; students: number; price: number }>();
+    const visibleCourses = deptId
+      ? this.state.courses.filter(c => c.department_id === deptId)
+      : this.state.courses;
+    visibleCourses.forEach(c => courseMap.set(c.id, { id: c.id, name: c.course_name, students: 0, price: c.base_price }));
+    students.forEach(s => {
+      const row = courseMap.get(s.course_id);
+      if (row) row.students += 1;
+    });
+    const courseBreakdown = Array.from(courseMap.values());
 
-    // Last 5 calendar months of real collections
+    // Collections trend: 12 months of the selected year, or the last 5 months by default
     const monthShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const now = new Date();
+    const deptPayments = this.state.payments.filter(p => p.payment_status === 'success' && deptStudentIds.has(p.student_id));
+    const sumFor = (y: number, m: number) => deptPayments
+      .filter(p => {
+        const pd = new Date(p.payment_date);
+        return pd.getFullYear() === y && pd.getMonth() === m;
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+
     const monthlyCollections: { month: string; amount: number }[] = [];
-    for (let i = 4; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const amount = payments
-        .filter(p => {
-          const pd = new Date(p.payment_date);
-          return pd.getFullYear() === d.getFullYear() && pd.getMonth() === d.getMonth();
-        })
-        .reduce((sum, p) => sum + p.amount, 0);
-      monthlyCollections.push({ month: `${monthShort[d.getMonth()]} ${d.getFullYear()}`, amount });
+    if (year) {
+      for (let m = 0; m < 12; m++) {
+        if (month && m + 1 !== month) continue;
+        monthlyCollections.push({ month: `${monthShort[m]} ${year}`, amount: sumFor(year, m) });
+      }
+    } else {
+      const now = new Date();
+      for (let i = 4; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        monthlyCollections.push({ month: `${monthShort[d.getMonth()]} ${d.getFullYear()}`, amount: sumFor(d.getFullYear(), d.getMonth()) });
+      }
     }
 
     return {
       totalStudents,
       activeStudents,
       completedStudents,
+      onHoldStudents,
+      droppedStudents,
       totalTrainers,
       totalRevenue,
       amountCollected,
@@ -516,9 +622,40 @@ class DatabaseService {
       partialPaymentsCount,
       studentsWithDuesCount,
       pendingLeaveRequests,
-      fullStackCount,
-      aimlCount,
+      courseBreakdown,
       monthlyCollections
+    };
+  }
+
+  /** Years that have any data (joining / payment / due dates) – feeds the year filter */
+  public getAvailableYears(): number[] {
+    const years = new Set<number>([new Date().getFullYear()]);
+    const add = (d?: string) => {
+      if (!d) return;
+      const y = new Date(d).getFullYear();
+      if (!isNaN(y)) years.add(y);
+    };
+    this.state.students.forEach(s => add(s.joining_date));
+    this.state.payments.forEach(p => add(p.payment_date));
+    this.state.installments.forEach(i => add(i.due_date));
+    return Array.from(years).sort((a, b) => b - a);
+  }
+
+  /** Per-department roll-up used by the Departments page */
+  public getDepartmentSummary(departmentId: string) {
+    const students = this.state.students.filter(s => s.department_id === departmentId);
+    const ids = new Set(students.map(s => s.id));
+    const collected = this.state.payments
+      .filter(p => p.payment_status === 'success' && ids.has(p.student_id))
+      .reduce((sum, p) => sum + p.amount, 0);
+    const totalFees = students.reduce((sum, s) => sum + s.total_course_amount, 0);
+    return {
+      students,
+      courses: this.state.courses.filter(c => c.department_id === departmentId),
+      trainers: this.state.trainers.filter(t => t.department_id === departmentId),
+      totalFees,
+      collected,
+      outstanding: Math.max(0, totalFees - collected)
     };
   }
 

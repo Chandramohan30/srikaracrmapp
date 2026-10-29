@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Users, UserCheck, GraduationCap, DollarSign, CreditCard, 
   AlertTriangle, Clock, TrendingUp, Calendar, CheckCircle, 
-  ArrowUpRight, Plus, ExternalLink, ShieldAlert, Lock
+  ArrowUpRight, Plus, ExternalLink, ShieldAlert, Lock, Filter, Building2
 } from 'lucide-react';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
@@ -24,7 +24,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [isStudentPaymentModalOpen, setIsStudentPaymentModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const metrics = db.getDashboardMetrics();
+  // Dashboard filters: department (default = all), year (0 = all) and month (0 = whole year)
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [yearFilter, setYearFilter] = useState<number>(0);
+  const [monthFilter, setMonthFilter] = useState<number>(0);
+
+  const departments = db.getDepartments();
+  const availableYears = db.getAvailableYears();
+  const metrics = db.getDashboardMetrics({ department: departmentFilter, year: yearFilter, month: monthFilter });
+  const hasFilters = departmentFilter !== 'all' || yearFilter !== 0;
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const periodLabel = yearFilter
+    ? (monthFilter ? `${MONTHS[monthFilter - 1]} ${yearFilter}` : `Year ${yearFilter}`)
+    : 'All time';
+  const departmentLabel = departmentFilter === 'all'
+    ? 'All departments'
+    : (db.getDepartmentById(departmentFilter)?.name || 'Department');
   const recentLogs = db.getAuditLogs().slice(0, 6);
   const students = db.getStudents(currentUser.role, currentUser.id);
   const leaves = db.getLeaves(currentUser.role, currentUser.id);
@@ -250,6 +265,69 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
+      {/* Filters: Department + Month + Year */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex items-center gap-1 text-slate-500 font-semibold text-[11px] uppercase mr-1">
+          <Filter className="w-3.5 h-3.5" />
+          Filters
+        </div>
+
+        <select
+          value={departmentFilter}
+          onChange={(e) => setDepartmentFilter(e.target.value)}
+          className="p-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800 text-xs font-semibold"
+          aria-label="Department"
+        >
+          <option value="all">All Departments</option>
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>{d.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={yearFilter}
+          onChange={(e) => {
+            const y = Number(e.target.value);
+            setYearFilter(y);
+            if (!y) setMonthFilter(0);
+          }}
+          className="p-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800 text-xs font-semibold"
+          aria-label="Year"
+        >
+          <option value={0}>All Years</option>
+          {availableYears.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
+        </select>
+
+        <select
+          value={monthFilter}
+          onChange={(e) => setMonthFilter(Number(e.target.value))}
+          disabled={!yearFilter}
+          className="p-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800 text-xs font-semibold disabled:opacity-50"
+          aria-label="Month"
+          title={yearFilter ? '' : 'Pick a year to filter by month'}
+        >
+          <option value={0}>Whole Year</option>
+          {MONTHS.map((m, i) => (
+            <option key={m} value={i + 1}>{m}</option>
+          ))}
+        </select>
+
+        <span className="ml-auto text-[11px] text-slate-500">
+          Showing <strong className="text-slate-800">{departmentLabel}</strong> · <strong className="text-slate-800">{periodLabel}</strong>
+        </span>
+
+        {hasFilters && (
+          <button
+            onClick={() => { setDepartmentFilter('all'); setYearFilter(0); setMonthFilter(0); }}
+            className="text-red-700 font-semibold hover:underline text-[11px]"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
       {/* Section 3: 10 KPI Cards */}
       <div>
        
@@ -266,7 +344,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-bold text-slate-900 tabular-nums">
               {metrics.totalStudents}
             </div>
-            <span className="text-[10px] text-slate-400 block mt-0.5">Enrolled overall</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">{yearFilter ? `Joined in ${periodLabel}` : 'Enrolled overall'}</span>
           </div>
 
           {/* 2. Active Students */}
@@ -311,7 +389,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-bold text-slate-900 tabular-nums">
               {metrics.totalTrainers}
             </div>
-            <span className="text-[10px] text-slate-400 block mt-0.5">Full Stack & AI Faculty</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">{departmentFilter === 'all' ? 'All departments' : departmentLabel}</span>
           </div>
 
           {/* 5. Total Revenue */}
@@ -326,7 +404,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-bold text-slate-900 tabular-nums">
               {formatCurrency(metrics.totalRevenue)}
             </div>
-            <span className="text-[10px] text-slate-400 block mt-0.5">Total course bookings</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">{yearFilter ? 'Fees billed in period' : 'Total course bookings'}</span>
           </div>
 
           {/* 6. Amount Collected */}
@@ -341,7 +419,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-bold text-emerald-700 tabular-nums">
               {formatCurrency(metrics.amountCollected)}
             </div>
-            <span className="text-[10px] text-emerald-600 block mt-0.5">Valid payments</span>
+            <span className="text-[10px] text-emerald-600 block mt-0.5">{yearFilter ? 'Received in period' : 'Valid payments'}</span>
           </div>
 
           {/* 7. Total Outstanding */}
@@ -356,7 +434,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-bold text-red-700 tabular-nums">
               {formatCurrency(metrics.totalOutstanding)}
             </div>
-            <span className="text-[10px] text-red-600 block mt-0.5">Remaining uncollected</span>
+            <span className="text-[10px] text-red-600 block mt-0.5">{yearFilter ? 'Unpaid on period dues' : 'Remaining uncollected'}</span>
           </div>
 
           {/* 8. Partial Payments */}
@@ -461,23 +539,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-3">
                 Monthly Collections Trend
               </span>
-              <div className="grid grid-cols-5 gap-2 text-center">
+              <div
+                className="grid gap-2 text-center"
+                style={{ gridTemplateColumns: `repeat(${metrics.monthlyCollections.length}, minmax(0, 1fr))` }}
+              >
                 {metrics.monthlyCollections.map((m) => {
-                  const maxAmt = 30000;
+                  const maxAmt = Math.max(1, ...metrics.monthlyCollections.map(x => x.amount));
                   const barHeight = Math.min(100, Math.round((m.amount / maxAmt) * 100));
                   return (
                     <div key={m.month} className="flex flex-col items-center">
                       <div className="h-28 w-full bg-slate-50 rounded-lg flex items-end justify-center p-1">
                         <div 
                           className="w-full bg-red-700 rounded transition-all hover:bg-red-800"
-                          style={{ height: `${Math.max(15, barHeight)}%` }}
+                          style={{ height: `${m.amount > 0 ? Math.max(8, barHeight) : 2}%` }}
                           title={`${m.month}: ${formatCurrency(m.amount)}`}
                         />
                       </div>
                       <span className="text-[10px] font-semibold text-slate-700 mt-2 truncate w-full">
-                        {m.month}
+                        {metrics.monthlyCollections.length > 6 ? m.month.split(' ')[0] : m.month}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-900 tabular-nums">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-900 tabular-nums truncate w-full">
                         {formatCurrency(m.amount)}
                       </span>
                     </div>
@@ -492,45 +573,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">
           <div className="pb-2 border-b border-slate-100">
             <h3 className="text-sm font-bold text-slate-900">Course Distribution</h3>
-            <p className="text-[11px] text-slate-500">Student enrollment by technical branch</p>
+            <p className="text-[11px] text-slate-500">Student enrollment by course · {departmentLabel}</p>
           </div>
 
           <div className="space-y-3">
-            {/* Full Stack */}
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-800">Full Stack Development</span>
-                <span className="font-extrabold text-red-700 tabular-nums">{metrics.fullStackCount} Students</span>
-              </div>
-              <div className="w-full h-2 bg-slate-200 rounded-full mt-2 overflow-hidden">
-                <div 
-                  className="bg-red-700 h-full" 
-                  style={{ width: `${(metrics.fullStackCount / (metrics.totalStudents || 1)) * 100}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                <span>Fee: ₹30,000</span>
-                <span>4-5 Months</span>
-              </div>
-            </div>
-
-            {/* AI/ML */}
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <div className="flex justify-between items-center text-xs">
-                <span className="font-bold text-slate-800">AI / Machine Learning</span>
-                <span className="font-extrabold text-amber-700 tabular-nums">{metrics.aimlCount} Students</span>
-              </div>
-              <div className="w-full h-2 bg-slate-200 rounded-full mt-2 overflow-hidden">
-                <div 
-                  className="bg-amber-600 h-full" 
-                  style={{ width: `${(metrics.aimlCount / (metrics.totalStudents || 1)) * 100}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                <span>Fee: ₹35,000</span>
-                <span>4-5 Months</span>
-              </div>
-            </div>
+            {metrics.courseBreakdown.length === 0 && (
+              <p className="text-xs text-slate-500">No courses in this department yet.</p>
+            )}
+            {metrics.courseBreakdown.map((c, idx) => {
+              const colors = ['bg-red-700', 'bg-amber-600', 'bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-slate-600'];
+              return (
+                <div key={c.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="flex justify-between items-center text-xs gap-2">
+                    <span className="font-bold text-slate-800 truncate">{c.name}</span>
+                    <span className="font-extrabold text-slate-900 tabular-nums shrink-0">{c.students} Students</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-200 rounded-full mt-2 overflow-hidden">
+                    <div
+                      className={`${colors[idx % colors.length]} h-full`}
+                      style={{ width: `${(c.students / (metrics.totalStudents || 1)) * 100}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                    <span>Fee: {formatCurrency(c.price)}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Student Status Summary */}
@@ -549,16 +618,60 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <div className="flex justify-between p-2 rounded bg-amber-50/60 border border-amber-100">
                 <span className="text-slate-600">On Hold</span>
-                <span className="font-bold text-amber-800">0</span>
+                <span className="font-bold text-amber-800">{metrics.onHoldStudents}</span>
               </div>
               <div className="flex justify-between p-2 rounded bg-red-50/60 border border-red-100">
                 <span className="text-slate-600">Dropped</span>
-                <span className="font-bold text-red-800">0</span>
+                <span className="font-bold text-red-800">{metrics.droppedStudents}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Department-wise summary (follows the Month / Year filter) */}
+      {isAdmin && departmentFilter === 'all' && departments.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs">
+          <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-red-700" /> Department-wise Summary
+              </h3>
+              <p className="text-[11px] text-slate-500">{periodLabel} · click a row to focus the dashboard on it</p>
+            </div>
+            <button onClick={() => onNavigate('departments')} className="text-xs font-semibold text-red-700 hover:underline">
+              Departments &rarr;
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th className="py-2 pr-3 font-semibold">Department</th>
+                  <th className="py-2 px-3 font-semibold text-right">Students</th>
+                  <th className="py-2 px-3 font-semibold text-right">Revenue</th>
+                  <th className="py-2 px-3 font-semibold text-right">Collected</th>
+                  <th className="py-2 pl-3 font-semibold text-right">Outstanding</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {departments.map((d) => {
+                  const m = db.getDashboardMetrics({ department: d.id, year: yearFilter, month: monthFilter });
+                  return (
+                    <tr key={d.id} onClick={() => setDepartmentFilter(d.id)} className="hover:bg-slate-50 cursor-pointer">
+                      <td className="py-2 pr-3 font-semibold text-slate-800">{d.name}</td>
+                      <td className="py-2 px-3 text-right tabular-nums">{m.totalStudents}</td>
+                      <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(m.totalRevenue)}</td>
+                      <td className="py-2 px-3 text-right tabular-nums text-emerald-700 font-semibold">{formatCurrency(m.amountCollected)}</td>
+                      <td className="py-2 pl-3 text-right tabular-nums text-red-700 font-semibold">{formatCurrency(m.totalOutstanding)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Section 3: Recent Activity & Audit Feed */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs">

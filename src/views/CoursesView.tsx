@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
 import { BookOpen, Plus, Edit, Check, X, Users, DollarSign, Clock } from 'lucide-react';
+import { Filter, Trash2 } from 'lucide-react';
 import { Course } from '../types/crm';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../components/StatusBadges';
 
-export const CoursesView: React.FC = () => {
+interface CoursesViewProps {
+  initialDepartmentId?: string;
+}
+
+export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 'all' }) => {
   const { currentUser, isAdmin } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [departmentFilter, setDepartmentFilter] = useState(initialDepartmentId);
+  const departments = db.getDepartments();
 
   // New course form
   const [newCourse, setNewCourse] = useState({
@@ -18,6 +25,7 @@ export const CoursesView: React.FC = () => {
     description: '',
     duration: '4–5 Months',
     base_price: 30000,
+    department_id: '',
     status: 'active' as Course['status']
   });
 
@@ -38,6 +46,7 @@ export const CoursesView: React.FC = () => {
         base_price: editingCourse.base_price,
         duration: editingCourse.duration,
         description: editingCourse.description,
+        department_id: editingCourse.department_id || '',
         status: editingCourse.status
       }, currentUser);
       setEditingCourse(null);
@@ -58,6 +67,7 @@ export const CoursesView: React.FC = () => {
         description: '',
         duration: '4–5 Months',
         base_price: 30000,
+        department_id: '',
         status: 'active'
       });
       reloadData();
@@ -88,9 +98,22 @@ export const CoursesView: React.FC = () => {
         )}
       </div>
 
+      {/* Department filter */}
+      <div className="flex items-center gap-2 text-xs">
+        <Filter className="w-3.5 h-3.5 text-slate-500" />
+        <select
+          value={departmentFilter}
+          onChange={(e) => setDepartmentFilter(e.target.value)}
+          className="p-1.5 bg-white border border-slate-200 rounded text-slate-700 text-xs font-semibold"
+        >
+          <option value="all">All Departments</option>
+          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+      </div>
+
       {/* Courses Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {courses.map((course) => {
+        {courses.filter(c => departmentFilter === 'all' || c.department_id === departmentFilter).map((course) => {
           const enrolledCount = db.getStudents().filter(s => s.course_id === course.id).length;
           return (
             <div 
@@ -106,6 +129,9 @@ export const CoursesView: React.FC = () => {
                     <h3 className="text-base font-bold text-slate-900 mt-1">
                       {course.course_name}
                     </h3>
+                    <span className="text-[10px] font-semibold text-slate-500">
+                      Dept: {course.department_name || 'Unassigned'}
+                    </span>
                   </div>
 
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
@@ -156,6 +182,17 @@ export const CoursesView: React.FC = () => {
                 </div>
 
                 {isAdmin && (
+                  <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm(`Delete course "${course.course_name}"?`)) return;
+                      try { await db.deleteCourse(course.id); reloadData(); } catch (err: any) { alert(err.message); }
+                    }}
+                    title="Delete course"
+                    className="p-1.5 text-red-600 hover:text-white hover:bg-red-600 border border-red-200 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={() => setEditingCourse({ ...course })}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
@@ -163,6 +200,7 @@ export const CoursesView: React.FC = () => {
                     <Edit className="w-3.5 h-3.5" />
                     Edit Price / Details
                   </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -245,6 +283,18 @@ export const CoursesView: React.FC = () => {
                     <option value="inactive">Inactive</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Department</label>
+                <select
+                  value={editingCourse.department_id || ''}
+                  onChange={(e) => setEditingCourse({ ...editingCourse, department_id: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                >
+                  <option value="">— Unassigned —</option>
+                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
               </div>
 
               <div>
@@ -344,6 +394,19 @@ export const CoursesView: React.FC = () => {
                   onChange={(e) => setNewCourse({ ...newCourse, base_price: parseFloat(e.target.value) || 0 })}
                   className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-red-600 tabular-nums"
                 />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Department *</label>
+                <select
+                  required
+                  value={newCourse.department_id}
+                  onChange={(e) => setNewCourse({ ...newCourse, department_id: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                >
+                  <option value="">Select department…</option>
+                  {departments.filter(d => d.status === 'active').map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
               </div>
 
               <div>

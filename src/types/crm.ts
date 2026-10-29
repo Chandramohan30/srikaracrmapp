@@ -13,6 +13,16 @@ export interface User {
   created_at: string;
 }
 
+export interface Department {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Course {
   id: string;
   course_code: string;
@@ -20,6 +30,8 @@ export interface Course {
   description: string;
   duration: string;
   base_price: number;
+  department_id?: string;
+  department_name?: string;
   status: 'active' | 'inactive';
   created_at: string;
   updated_at: string;
@@ -33,6 +45,8 @@ export interface Trainer {
   email: string;
   phone: string;
   specialization: string;
+  department_id?: string;
+  department_name?: string;
   experience: string;
   joining_date: string;
   status: 'active' | 'inactive';
@@ -78,6 +92,8 @@ export interface Student {
   qualification: string;
   college?: string;
   passing_year?: string;
+  department_id?: string;
+  department_name?: string;
   course_id: string;
   course_name: string;
   trainer_id: string;

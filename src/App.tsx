@@ -4,6 +4,7 @@ import { Sidebar, NavTab } from './components/Sidebar';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './views/DashboardView';
 import { StudentsView } from './views/StudentsView';
+import { DepartmentsView } from './views/DepartmentsView';
 import { CoursesView } from './views/CoursesView';
 import { TrainersView } from './views/TrainersView';
 import { PaymentsView } from './views/PaymentsView';
@@ -26,6 +27,8 @@ const AppContent: React.FC = () => {
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
   const [scheduleStudentFilter, setScheduleStudentFilter] = useState<string | undefined>(undefined);
   const [refreshKey, setRefreshKey] = useState(0);
+  // department chosen via a Departments-page link; Students / Courses / Trainers pages start filtered to it
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
 
   const refreshData = async () => {
     try {
@@ -83,6 +86,7 @@ const AppContent: React.FC = () => {
         onSelectTab={(tab) => {
           setCurrentTab(tab);
           setScheduleStudentFilter(undefined);
+          setDepartmentFilter('all');
           refreshData(); // pull the latest data from MongoDB
         }}
         isOpen={isSidebarOpen}
@@ -111,16 +115,26 @@ const AppContent: React.FC = () => {
               />
             )}
 
+            {currentTab === 'departments' && (
+              <DepartmentsView
+                onOpenDepartmentLink={(tab, deptId) => {
+                  setDepartmentFilter(deptId);
+                  setCurrentTab(tab);
+                }}
+              />
+            )}
+
             {currentTab === 'students' && (
               <StudentsView
+                initialDepartmentId={departmentFilter}
                 onOpenOnboardModal={() => setIsOnboardModalOpen(true)}
                 onNavigateToSchedule={handleNavigateToSchedule}
               />
             )}
 
-            {currentTab === 'courses' && <CoursesView />}
+            {currentTab === 'courses' && <CoursesView initialDepartmentId={departmentFilter} />}
 
-            {currentTab === 'trainers' && <TrainersView />}
+            {currentTab === 'trainers' && <TrainersView initialDepartmentId={departmentFilter} />}
 
             {currentTab === 'payments' && <PaymentsView />}
 

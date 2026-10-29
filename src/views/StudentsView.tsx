@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Search, Filter, Plus, CreditCard, Eye, Edit, UserCheck, 
   CalendarClock, X, Check, AlertCircle, Phone, Mail, MapPin, 
-  GraduationCap, BookOpen, Clock, ChevronDown
+  GraduationCap, BookOpen, Clock, ChevronDown, Trash2
 } from 'lucide-react';
 import { Student, Course, Trainer, StudentStatus, StudentPaymentStatus } from '../types/crm';
 import { db } from '../services/db';
@@ -16,11 +16,13 @@ import { StudentPaymentModal } from '../components/StudentPaymentModal';
 interface StudentsViewProps {
   onOpenOnboardModal: () => void;
   onNavigateToSchedule?: (studentId: string) => void;
+  initialDepartmentId?: string;
 }
 
 export const StudentsView: React.FC<StudentsViewProps> = ({
   onOpenOnboardModal,
-  onNavigateToSchedule
+  onNavigateToSchedule,
+  initialDepartmentId = 'all'
 }) => {
   const { currentUser, isAdmin, isTrainer } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
@@ -29,6 +31,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
 
   // Search & Filters (Section 34)
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState(initialDepartmentId);
   const [selectedCourseFilter, setSelectedCourseFilter] = useState('all');
   const [selectedTrainerFilter, setSelectedTrainerFilter] = useState('all');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('all');
@@ -63,13 +66,14 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
       s.email.toLowerCase().includes(q);
 
     // Filters
+    const matchesDepartment = selectedDepartmentFilter === 'all' || s.department_id === selectedDepartmentFilter;
     const matchesCourse = selectedCourseFilter === 'all' || s.course_id === selectedCourseFilter;
     const matchesTrainer = selectedTrainerFilter === 'all' || s.trainer_id === selectedTrainerFilter;
     const matchesStatus = selectedStatusFilter === 'all' || s.status === selectedStatusFilter;
     const matchesPaymentStatus = 
       selectedPaymentStatusFilter === 'all' || s.payment_status === selectedPaymentStatusFilter;
 
-    return matchesSearch && matchesCourse && matchesTrainer && matchesStatus && matchesPaymentStatus;
+    return matchesSearch && matchesDepartment && matchesCourse && matchesTrainer && matchesStatus && matchesPaymentStatus;
   });
 
   // Handle Edit Student submit
@@ -144,6 +148,24 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
             Filters:
           </div>
 
+          {/* Department filter */}
+          {isAdmin && (
+            <select
+              value={selectedDepartmentFilter}
+              onChange={(e) => {
+                setSelectedDepartmentFilter(e.target.value);
+                setSelectedCourseFilter('all');
+                setSelectedTrainerFilter('all');
+              }}
+              className="p-1.5 bg-slate-50 border border-slate-200 rounded text-slate-700 text-xs font-semibold"
+            >
+              <option value="all">All Departments</option>
+              {db.getDepartments().map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          )}
+
           {/* Course filter */}
           <select
             value={selectedCourseFilter}
@@ -151,7 +173,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
             className="p-1.5 bg-slate-50 border border-slate-200 rounded text-slate-700 text-xs"
           >
             <option value="all">All Courses</option>
-            {courses.map((c) => (
+            {courses.filter(c => selectedDepartmentFilter === 'all' || c.department_id === selectedDepartmentFilter).map((c) => (
               <option key={c.id} value={c.id}>{c.course_name}</option>
             ))}
           </select>
@@ -164,7 +186,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
               className="p-1.5 bg-slate-50 border border-slate-200 rounded text-slate-700 text-xs"
             >
               <option value="all">All Trainers</option>
-              {trainers.map((t) => (
+              {trainers.filter(t => selectedDepartmentFilter === 'all' || t.department_id === selectedDepartmentFilter).map((t) => (
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
@@ -198,9 +220,10 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
             <option value="not_paid">Not Paid</option>
           </select>
 
-          {(selectedCourseFilter !== 'all' || selectedTrainerFilter !== 'all' || selectedStatusFilter !== 'all' || selectedPaymentStatusFilter !== 'all' || searchQuery) && (
+          {(selectedDepartmentFilter !== 'all' || selectedCourseFilter !== 'all' || selectedTrainerFilter !== 'all' || selectedStatusFilter !== 'all' || selectedPaymentStatusFilter !== 'all' || searchQuery) && (
             <button
               onClick={() => {
+                setSelectedDepartmentFilter('all');
                 setSelectedCourseFilter('all');
                 setSelectedTrainerFilter('all');
                 setSelectedStatusFilter('all');
@@ -235,6 +258,7 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                 <tr>
                   <th className="py-3 px-3.5">Student ID & Name</th>
                   <th className="py-3 px-3.5">Phone / Contact</th>
+                  <th className="py-3 px-3.5">Department</th>
                   <th className="py-3 px-3.5">Course</th>
                   <th className="py-3 px-3.5">Trainer</th>
                   <th className="py-3 px-3.5">Joining Date</th>
@@ -272,6 +296,11 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                       <div className="text-[10px] text-slate-400 truncate max-w-[120px] font-sans">
                         {std.email}
                       </div>
+                    </td>
+
+                    {/* Department */}
+                    <td className="py-3 px-3.5 text-slate-700">
+                      {std.department_name || <span className="text-slate-300">—</span>}
                     </td>
 
                     {/* Course */}
@@ -331,6 +360,20 @@ export const StudentsView: React.FC<StudentsViewProps> = ({
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
+
+                        {/* 🗑 Delete (Admin Only) */}
+                        {isAdmin && (
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm(`Permanently delete ${std.full_name} (${std.student_code})?\n\nThis also deletes their installments, payments, leaves, class schedules and login. This cannot be undone.`)) return;
+                              try { await db.deleteStudent(std.id); reloadData(); } catch (err: any) { alert(err.message); }
+                            }}
+                            title="Delete Student"
+                            className="p-1.5 text-red-600 hover:text-white hover:bg-red-600 rounded transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
 
                         {/* ✏ Edit (Admin Only) */}
                         {isAdmin && (

@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   LayoutDashboard, Users, BookOpen, GraduationCap, CreditCard, 
   CalendarClock, Calendar, FileText, Settings, UserCheck, 
-  Clock, ShieldAlert, LogOut, ChevronRight
+  Clock, ShieldAlert, LogOut, ChevronRight, Building2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SrikaraLogo } from './SrikaraLogo';
@@ -10,6 +10,7 @@ import { SrikaraLogo } from './SrikaraLogo';
 export type NavTab = 
   | 'dashboard'
   | 'students'
+  | 'departments'
   | 'courses'
   | 'trainers'
   | 'payments'
@@ -45,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (isAdmin) {
       return [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'departments', label: 'Departments', icon: Building2 },
         { id: 'students', label: 'Students', icon: Users },
         { id: 'courses', label: 'Courses', icon: BookOpen },
         { id: 'trainers', label: 'Trainers', icon: GraduationCap },

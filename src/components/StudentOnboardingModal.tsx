@@ -4,7 +4,7 @@ import {
   GraduationCap, CreditCard, Sparkles, AlertCircle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Course, Trainer } from '../types/crm';
+import { Course, Trainer, Department } from '../types/crm';
 import { db, getMonthNamesFromDate, splitAmountIntoTwoInstallments } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from './StatusBadges';
@@ -23,6 +23,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
   const { currentUser } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   // Wizard Step (1 to 5)
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -43,7 +44,8 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
     qualification: 'B.E Computer Science',
     college: '',
     passing_year: '2025',
-    // Step 2: Course
+    // Step 2: Department + Course
+    department_id: '',
     course_id: '',
     joining_date: new Date().toISOString().split('T')[0],
     // Step 3: Trainer
@@ -58,14 +60,20 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
     if (isOpen) {
       const allCourses = db.getCourses().filter(c => c.status === 'active');
       const allTrainers = db.getTrainers().filter(t => t.status === 'active');
+      const allDepartments = db.getDepartments().filter(d => d.status === 'active');
       setCourses(allCourses);
       setTrainers(allTrainers);
-      if (allCourses.length > 0 && !formData.course_id) {
-        setFormData(prev => ({ ...prev, course_id: allCourses[0].id }));
-      }
-      if (allTrainers.length > 0 && !formData.trainer_id) {
-        setFormData(prev => ({ ...prev, trainer_id: allTrainers[0].id }));
-      }
+      setDepartments(allDepartments);
+      const firstDept = allDepartments[0]?.id || '';
+      const deptId = formData.department_id || firstDept;
+      const deptCourses = deptId ? allCourses.filter(c => c.department_id === deptId) : allCourses;
+      const deptTrainers = deptId ? allTrainers.filter(t => t.department_id === deptId) : allTrainers;
+      setFormData(prev => ({
+        ...prev,
+        department_id: deptId,
+        course_id: prev.course_id && deptCourses.some(c => c.id === prev.course_id) ? prev.course_id : (deptCourses[0]?.id || ''),
+        trainer_id: prev.trainer_id && deptTrainers.some(t => t.id === prev.trainer_id) ? prev.trainer_id : (deptTrainers[0]?.id || '')
+      }));
       setCurrentStep(1);
       setFormError(null);
     }
@@ -73,10 +81,25 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Only courses / trainers of the chosen department are offered
+  const deptCourses = formData.department_id ? courses.filter(c => c.department_id === formData.department_id) : courses;
+  const deptTrainers = formData.department_id ? trainers.filter(t => t.department_id === formData.department_id) : trainers;
+
+  const handleDepartmentChange = (deptId: string) => {
+    const dc = deptId ? courses.filter(c => c.department_id === deptId) : courses;
+    const dt = deptId ? trainers.filter(t => t.department_id === deptId) : trainers;
+    setFormData({
+      ...formData,
+      department_id: deptId,
+      course_id: dc[0]?.id || '',
+      trainer_id: dt[0]?.id || ''
+    });
+  };
+
   // Selected Course Object (Fetches base price automatically, rule 2 & 3)
-  const selectedCourse = courses.find(c => c.id === formData.course_id) || courses[0];
+  const selectedCourse = deptCourses.find(c => c.id === formData.course_id) || deptCourses[0];
   // Selected Trainer Object
-  const selectedTrainer = trainers.find(t => t.id === formData.trainer_id) || trainers[0];
+  const selectedTrainer = deptTrainers.find(t => t.id === formData.trainer_id) || deptTrainers[0];
 
   // Calculated 2 Installments for Step 4 & 5
   const coursePrice = selectedCourse ? selectedCourse.base_price : 30000;
@@ -109,8 +132,12 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
       }
     }
     if (step === 2) {
+      if (departments.length > 0 && !formData.department_id) {
+        setFormError('Please select a department.');
+        return false;
+      }
       if (!formData.course_id) {
-        setFormError('Please select a course.');
+        setFormError(departments.length > 0 ? 'This department has no active course yet. Add one in Courses first.' : 'Please select a course.');
         return false;
       }
       if (!formData.joining_date) {
@@ -120,7 +147,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
     }
     if (step === 3) {
       if (!formData.trainer_id) {
-        setFormError('Please assign a trainer.');
+        setFormError(departments.length > 0 ? 'This department has no active trainer yet. Add one in Trainers first.' : 'Please assign a trainer.');
         return false;
       }
     }
@@ -156,6 +183,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
         qualification: formData.qualification,
         college: formData.college,
         passing_year: formData.passing_year,
+        department_id: formData.department_id || undefined,
         course_id: selectedCourse.id,
         trainer_id: selectedTrainer.id,
         joining_date: formData.joining_date
@@ -414,6 +442,25 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
               <div className="space-y-3 text-xs">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
+                    Select Department *
+                  </label>
+                  <select
+                    value={formData.department_id}
+                    onChange={(e) => handleDepartmentChange(e.target.value)}
+                    className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
+                  >
+                    {departments.length === 0 && <option value="">No departments (add one in Departments)</option>}
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Courses and trainers below are limited to the selected department.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
                     Select Course *
                   </label>
                   <select
@@ -421,7 +468,8 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     onChange={(e) => setFormData({ ...formData, course_id: e.target.value })}
                     className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
                   >
-                    {courses.map((c) => (
+                    {deptCourses.length === 0 && <option value="">No courses in this department</option>}
+                    {deptCourses.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.course_name} — {formatCurrency(c.base_price)} ({c.duration})
                       </option>
@@ -483,7 +531,8 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     onChange={(e) => setFormData({ ...formData, trainer_id: e.target.value })}
                     className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
                   >
-                    {trainers.map((t) => (
+                    {deptTrainers.length === 0 && <option value="">No trainers in this department</option>}
+                    {deptTrainers.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name} ({t.trainer_code}) — {t.specialization} [{t.experience}]
                       </option>

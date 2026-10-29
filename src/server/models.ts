@@ -1,5 +1,24 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+// 0. Department Schema & Model
+export interface IDepartment extends Document {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  status: 'active' | 'inactive';
+  created_at: Date;
+  updated_at: Date;
+}
+
+export const DepartmentSchema = new Schema<IDepartment>({
+  id: { type: String, required: true, unique: true },
+  code: { type: String, required: true, unique: true },
+  name: { type: String, required: true, unique: true },
+  description: { type: String, default: '' },
+  status: { type: String, default: 'active', enum: ['active', 'inactive'] }
+}, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
+
 // 1. User Schema & Model
 export interface IUser extends Document {
   id: string;
@@ -37,6 +56,8 @@ export interface ICourse extends Document {
   description: string;
   duration: string;
   base_price: number;
+  department_id?: string;
+  department_name?: string;
   status: 'active' | 'inactive';
   created_at: Date;
   updated_at: Date;
@@ -49,6 +70,8 @@ export const CourseSchema = new Schema<ICourse>({
   description: { type: String, default: '' },
   duration: { type: String, required: true },
   base_price: { type: Number, required: true, min: 0 },
+  department_id: { type: String, default: '', index: true },
+  department_name: { type: String, default: '' },
   status: { type: String, default: 'active', enum: ['active', 'inactive'] },
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
@@ -61,6 +84,8 @@ export interface ITrainer extends Document {
   email: string;
   phone: string;
   specialization: string;
+  department_id?: string;
+  department_name?: string;
   experience: string;
   joining_date: string;
   status: 'active' | 'inactive';
@@ -79,6 +104,8 @@ export const TrainerSchema = new Schema<ITrainer>({
   email: { type: String, required: true, lowercase: true, trim: true },
   phone: { type: String, default: '' },
   specialization: { type: String, default: '' },
+  department_id: { type: String, default: '', index: true },
+  department_name: { type: String, default: '' },
   experience: { type: String, default: '' },
   joining_date: { type: String, default: '' },
   status: { type: String, default: 'active', enum: ['active', 'inactive'] },
@@ -106,6 +133,8 @@ export interface IStudent extends Document {
   qualification: string;
   college?: string;
   passing_year?: string;
+  department_id?: string;
+  department_name?: string;
   course_id: string;
   course_name: string;
   trainer_id: string;
@@ -139,6 +168,8 @@ export const StudentSchema = new Schema<IStudent>({
   qualification: { type: String, default: '' },
   college: { type: String },
   passing_year: { type: String },
+  department_id: { type: String, default: '', index: true },
+  department_name: { type: String, default: '' },
   course_id: { type: String, required: true },
   course_name: { type: String, required: true },
   trainer_id: { type: String, required: true },
@@ -469,6 +500,7 @@ export const FollowUpSchema = new Schema<IFollowUp>({
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 // Export Models
+export const DepartmentModel = mongoose.models.Department || mongoose.model<IDepartment>('Department', DepartmentSchema);
 export const UserModel = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
 export const CourseModel = mongoose.models.Course || mongoose.model<ICourse>('Course', CourseSchema);
 export const TrainerModel = mongoose.models.Trainer || mongoose.model<ITrainer>('Trainer', TrainerSchema);

@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
 import { GraduationCap, Users, Plus, Mail, Phone, Calendar, Clock, Edit, X, Check, BookOpen } from 'lucide-react';
+import { Filter, Trash2 } from 'lucide-react';
 import { Trainer, Student } from '../types/crm';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
 
-export const TrainersView: React.FC = () => {
+interface TrainersViewProps {
+  initialDepartmentId?: string;
+}
+
+export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId = 'all' }) => {
   const { currentUser, isAdmin } = useAuth();
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedTrainerDetails, setSelectedTrainerDetails] = useState<Trainer | null>(null);
   const [showAddTrainerModal, setShowAddTrainerModal] = useState(false);
+  const [departmentFilter, setDepartmentFilter] = useState(initialDepartmentId);
+  const departments = db.getDepartments();
 
   // New trainer form
   const [newTrainerForm, setNewTrainerForm] = useState({
@@ -18,6 +25,7 @@ export const TrainersView: React.FC = () => {
     email: '',
     phone: '',
     specialization: 'Full Stack Web Development',
+    department_id: '',
     experience: '5+ Years',
     joining_date: new Date().toISOString().split('T')[0],
     status: 'active' as Trainer['status'],
@@ -44,6 +52,7 @@ export const TrainersView: React.FC = () => {
         email: newTrainerForm.email,
         phone: newTrainerForm.phone,
         specialization: newTrainerForm.specialization,
+        department_id: newTrainerForm.department_id,
         experience: newTrainerForm.experience,
         joining_date: newTrainerForm.joining_date,
         status: newTrainerForm.status,
@@ -60,6 +69,7 @@ export const TrainersView: React.FC = () => {
         email: '',
         phone: '',
         specialization: 'Full Stack Web Development',
+        department_id: '',
         experience: '5+ Years',
         joining_date: new Date().toISOString().split('T')[0],
         status: 'active',
@@ -93,9 +103,22 @@ export const TrainersView: React.FC = () => {
         )}
       </div>
 
+      {/* Department filter */}
+      <div className="flex items-center gap-2 text-xs">
+        <Filter className="w-3.5 h-3.5 text-slate-500" />
+        <select
+          value={departmentFilter}
+          onChange={(e) => setDepartmentFilter(e.target.value)}
+          className="p-1.5 bg-white border border-slate-200 rounded text-slate-700 text-xs font-semibold"
+        >
+          <option value="all">All Departments</option>
+          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+      </div>
+
       {/* Trainers Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {trainers.map((trainer) => {
+        {trainers.filter(t => departmentFilter === 'all' || t.department_id === departmentFilter).map((trainer) => {
           const assignedStudents = students.filter(s => s.trainer_id === trainer.id);
           return (
             <div 
@@ -120,6 +143,24 @@ export const TrainersView: React.FC = () => {
                       <p className="text-xs text-red-700 font-medium">
                         {trainer.specialization}
                       </p>
+                      {isAdmin ? (
+                        <select
+                          value={trainer.department_id || ''}
+                          onChange={async (e) => {
+                            try {
+                              await db.updateTrainer(trainer.id, { department_id: e.target.value }, currentUser);
+                              reloadData();
+                            } catch (err: any) { alert(err.message); }
+                          }}
+                          className="mt-0.5 text-[10px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded px-1 py-0.5"
+                          title="Change department"
+                        >
+                          <option value="">Dept: Unassigned</option>
+                          {departments.map(d => <option key={d.id} value={d.id}>Dept: {d.name}</option>)}
+                        </select>
+                      ) : (
+                        <p className="text-[10px] font-semibold text-slate-500">Dept: {trainer.department_name || 'Unassigned'}</p>
+                      )}
                     </div>
                   </div>
 
@@ -170,12 +211,26 @@ export const TrainersView: React.FC = () => {
                   <span className="font-bold text-slate-900">{assignedStudents.length}</span> Assigned Student(s)
                 </div>
 
-                <button
-                  onClick={() => setSelectedTrainerDetails(trainer)}
-                  className="text-xs font-semibold text-red-700 hover:underline"
-                >
-                  View Assigned Roster &rarr;
-                </button>
+                <div className="flex items-center gap-3">
+                  {isAdmin && (
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm(`Delete trainer ${trainer.name} (${trainer.trainer_code})? Their login and class schedules will be removed.`)) return;
+                        try { await db.deleteTrainer(trainer.id); reloadData(); } catch (err: any) { alert(err.message); }
+                      }}
+                      title="Delete trainer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedTrainerDetails(trainer)}
+                    className="text-xs font-semibold text-red-700 hover:underline"
+                  >
+                    View Assigned Roster &rarr;
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -311,6 +366,19 @@ export const TrainersView: React.FC = () => {
                     className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Department *</label>
+                <select
+                  required
+                  value={newTrainerForm.department_id}
+                  onChange={(e) => setNewTrainerForm({ ...newTrainerForm, department_id: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                >
+                  <option value="">Select department…</option>
+                  {departments.filter(d => d.status === 'active').map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
               </div>
 
               <div>

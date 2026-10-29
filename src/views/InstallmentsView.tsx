@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Clock, Plus, Filter, Search, AlertCircle, Edit, CreditCard, 
-  CheckCircle, ShieldAlert, X 
+  CheckCircle, ShieldAlert, X, Trash2 
 } from 'lucide-react';
 import { Installment, Student, ManualInstallmentInput } from '../types/crm';
 import { db } from '../services/db';
@@ -232,6 +232,18 @@ export const InstallmentsView: React.FC = () => {
                       >
                         Payment Details
                       </button>
+                      {isAdmin && (
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Delete "${inst.name || 'Installment ' + inst.installment_number}" (${inst.month}) of ₹${inst.installment_amount} for ${inst.student_name}?`)) return;
+                            try { await db.deleteInstallment(inst.id); reloadData(); } catch (err: any) { alert(err.message); }
+                          }}
+                          title="Delete installment"
+                          className="inline-flex items-center ml-1.5 p-1.5 text-red-600 hover:text-white hover:bg-red-600 border border-red-200 rounded transition-colors align-middle"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

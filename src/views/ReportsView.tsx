@@ -14,12 +14,13 @@ export const ReportsView: React.FC = () => {
   // Export CSV
   const handleExportCSV = () => {
     const headers = [
-      'Student ID', 'Student Name', 'Course', 'Trainer', 'Joining Date',
+      'Student ID', 'Student Name', 'Department', 'Course', 'Trainer', 'Joining Date',
       'Course Amount', 'Paid Amount', 'Outstanding Due', 'Payment Status', 'Status'
     ];
     const rows = students.map(s => [
       s.student_code,
       `"${s.full_name}"`,
+      `"${s.department_name || ''}"`,
       `"${s.course_name}"`,
       `"${s.trainer_name}"`,
       s.joining_date,

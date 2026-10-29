@@ -13,6 +13,7 @@ interface NavbarProps {
 const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
   dashboard: { title: 'Academy Overview', subtitle: 'Real-time KPI metrics, revenue, and active student enrollment' },
   students: { title: 'Student Master & Roster', subtitle: 'Manage student records, enrollment status, dues, and assignments' },
+  departments: { title: 'Departments', subtitle: 'Departments with their courses, trainers, students and fee collections' },
   courses: { title: 'Course Master', subtitle: 'Course curriculum definitions, duration, and base price configuration' },
   trainers: { title: 'Trainer Master', subtitle: 'Technical faculty profiles, specializations, and student allocations' },
   payments: { title: 'Payment Ledger', subtitle: 'Complete UPI transaction records, payment proofs, and receipts' },
