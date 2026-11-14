@@ -148,7 +148,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
           {(isAdmin || isTrainer) && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg shadow-2xs transition-colors"
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-2xs transition-colors"
             >
               <Plus className="w-4 h-4" />
               Schedule Class
@@ -309,7 +309,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
                   {daySchedules.map(ds => (
                     <div 
                       key={ds.id} 
-                      className="text-[9px] font-semibold bg-red-700 text-white p-1 rounded truncate leading-tight mt-1"
+                      className="text-[9px] font-semibold bg-blue-700 text-white p-1 rounded truncate leading-tight mt-1"
                       title={`${ds.title} (${ds.start_time})`}
                     >
                       {ds.start_time} {ds.title}
@@ -324,16 +324,16 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
 
       {/* --- ADD SCHEDULE MODAL --- */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-blue-950/50 backdrop-blur-xs">
           <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-white">
                   Schedule Class Session
                 </h3>
                 
               </div>
-              <button onClick={() => setShowAddModal(false)} className="p-1 text-slate-400 hover:text-white">
+              <button onClick={() => setShowAddModal(false)} className="p-1 text-blue-100 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -346,7 +346,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
                     required
                     value={scheduleForm.student_id}
                     onChange={(e) => setScheduleForm({ ...scheduleForm, student_id: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600"
                   >
                     {students.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -363,7 +363,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
                     required
                     value={scheduleForm.trainer_id}
                     onChange={(e) => setScheduleForm({ ...scheduleForm, trainer_id: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-red-600 bg-white"
+                    className="w-full p-2 border border-slate-300 rounded font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600 bg-white"
                   >
                     {trainers.map((t) => (
                       <option key={t.id} value={t.id}>{t.name}</option>
@@ -380,7 +380,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
                   placeholder="e.g. Full Stack System Architecture & DB Design"
                   value={scheduleForm.title}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, title: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -392,7 +392,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
                   placeholder="e.g. PostgreSQL foreign keys, indexing, and connection pools"
                   value={scheduleForm.topic}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, topic: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -404,7 +404,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
                     required
                     value={scheduleForm.class_date}
                     onChange={(e) => setScheduleForm({ ...scheduleForm, class_date: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
                 <div>
@@ -414,7 +414,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
                     required
                     value={scheduleForm.start_time}
                     onChange={(e) => setScheduleForm({ ...scheduleForm, start_time: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
                 <div>
@@ -424,7 +424,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
                     required
                     value={scheduleForm.end_time}
                     onChange={(e) => setScheduleForm({ ...scheduleForm, end_time: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
               </div>
@@ -436,7 +436,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
                   placeholder="Leave empty to auto-generate: https://meet.google.com/srk-xxxx-xxx"
                   value={scheduleForm.meeting_url}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, meeting_url: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -450,7 +450,7 @@ export const ClassScheduleView: React.FC<ClassScheduleViewProps> = ({ initialStu
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-white font-semibold bg-red-700 hover:bg-red-800 rounded shadow-xs"
+                  className="px-4 py-1.5 text-white font-semibold bg-blue-700 hover:bg-blue-800 rounded shadow-xs"
                 >
                   Save & Sync Calendar
                 </button>

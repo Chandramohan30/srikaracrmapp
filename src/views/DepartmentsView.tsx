@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Building2, Plus, Edit, Trash2, X, Users, GraduationCap, BookOpen, ArrowRight } from 'lucide-react';
+import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { DataTable, Column, IconAction, PrimaryButton, StatusPill, CountLink } from '../components/DataTable';
 import { Department } from '../types/crm';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
@@ -52,136 +53,90 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({ onOpenDepartme
     }
   };
 
-  const linkBtn = 'flex items-center justify-between w-full px-2.5 py-2 rounded-lg bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 text-xs transition-colors group';
+  const columns: Column<Department>[] = [
+    {
+      key: 'code', header: 'Code',
+      render: (d) => <span className="font-mono text-[11px] font-semibold text-slate-600">{d.code}</span>
+    },
+    {
+      key: 'name', header: 'Department',
+      render: (d) => (
+        <div className="max-w-[280px]">
+          <div className="font-semibold text-slate-900">{d.name}</div>
+          {d.description && <div className="text-[10px] text-slate-400 truncate">{d.description}</div>}
+        </div>
+      )
+    },
+    {
+      key: 'courses', header: 'Courses', align: 'center',
+      sortValue: (d) => db.getDepartmentSummary(d.id).courses.length,
+      render: (d) => <CountLink count={db.getDepartmentSummary(d.id).courses.length} title="Open courses" onClick={() => onOpenDepartmentLink('courses', d.id)} />
+    },
+    {
+      key: 'students', header: 'Students', align: 'center',
+      sortValue: (d) => db.getDepartmentSummary(d.id).students.length,
+      render: (d) => <CountLink count={db.getDepartmentSummary(d.id).students.length} title="Open students" onClick={() => onOpenDepartmentLink('students', d.id)} />
+    },
+    {
+      key: 'trainers', header: 'Trainers', align: 'center',
+      sortValue: (d) => db.getDepartmentSummary(d.id).trainers.length,
+      render: (d) => <CountLink count={db.getDepartmentSummary(d.id).trainers.length} title="Open trainers" onClick={() => onOpenDepartmentLink('trainers', d.id)} />
+    },
+    {
+      key: 'totalFees', header: 'Total Fees', align: 'right',
+      sortValue: (d) => db.getDepartmentSummary(d.id).totalFees,
+      render: (d) => <span className="tabular-nums font-semibold text-slate-900">{formatCurrency(db.getDepartmentSummary(d.id).totalFees)}</span>
+    },
+    {
+      key: 'collected', header: 'Collected', align: 'right',
+      sortValue: (d) => db.getDepartmentSummary(d.id).collected,
+      render: (d) => <span className="tabular-nums font-semibold text-emerald-700">{formatCurrency(db.getDepartmentSummary(d.id).collected)}</span>
+    },
+    {
+      key: 'outstanding', header: 'Outstanding', align: 'right',
+      sortValue: (d) => db.getDepartmentSummary(d.id).outstanding,
+      render: (d) => <span className="tabular-nums font-semibold text-red-600">{formatCurrency(db.getDepartmentSummary(d.id).outstanding)}</span>
+    },
+    { key: 'status', header: 'Status', render: (d) => <StatusPill status={d.status} /> }
+  ];
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">Departments</h2>
-          <p className="text-xs text-slate-500">
-            Group courses, trainers and students by department and track collections per department.
-          </p>
-        </div>
-        {isAdmin && (
-          <button
-            onClick={openAdd}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg shadow-2xs transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Department
-          </button>
-        )}
-      </div>
-
-      {departments.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center">
-          <Building2 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-700">No departments yet</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Create your first department, then assign courses and trainers to it.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {departments.map(dept => {
-            const sum = db.getDepartmentSummary(dept.id);
-            return (
-              <div key={dept.id} className="bg-white rounded-xl border border-slate-200 shadow-2xs p-5 hover:border-slate-300 transition-colors">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 uppercase">
-                      {dept.code}
-                    </span>
-                    <h3 className="text-base font-bold text-slate-900 mt-1 flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-red-700" />
-                      {dept.name}
-                    </h3>
-                    {dept.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{dept.description}</p>}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                      dept.status === 'active'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-slate-100 text-slate-500 border-slate-200'
-                    }`}>
-                      {dept.status}
-                    </span>
-                    {isAdmin && (
-                      <button onClick={() => openEdit(dept)} className="p-1.5 text-slate-500 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg" title="Edit department">
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    {isAdmin && (
-                      <button
-                        onClick={async () => {
-                          if (!window.confirm(`Delete department "${dept.name}"?`)) return;
-                          try { await db.deleteDepartment(dept.id); setTick(t => t + 1); } catch (err: any) { alert(err.message); }
-                        }}
-                        className="p-1.5 text-red-600 hover:text-white hover:bg-red-600 border border-red-200 rounded-lg"
-                        title="Delete department"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Department links */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
-                  <button className={linkBtn} onClick={() => onOpenDepartmentLink('courses', dept.id)}>
-                    <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
-                      <BookOpen className="w-3.5 h-3.5 text-slate-400" /> Courses
-                    </span>
-                    <span className="flex items-center gap-1 font-bold text-slate-900">
-                      {sum.courses.length}<ArrowRight className="w-3 h-3 text-slate-300 group-hover:text-red-600" />
-                    </span>
-                  </button>
-                  <button className={linkBtn} onClick={() => onOpenDepartmentLink('students', dept.id)}>
-                    <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
-                      <Users className="w-3.5 h-3.5 text-slate-400" /> Students
-                    </span>
-                    <span className="flex items-center gap-1 font-bold text-slate-900">
-                      {sum.students.length}<ArrowRight className="w-3 h-3 text-slate-300 group-hover:text-red-600" />
-                    </span>
-                  </button>
-                  <button className={linkBtn} onClick={() => onOpenDepartmentLink('trainers', dept.id)}>
-                    <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
-                      <GraduationCap className="w-3.5 h-3.5 text-slate-400" /> Trainers
-                    </span>
-                    <span className="flex items-center gap-1 font-bold text-slate-900">
-                      {sum.trainers.length}<ArrowRight className="w-3 h-3 text-slate-300 group-hover:text-red-600" />
-                    </span>
-                  </button>
-                </div>
-
-                {/* Department money */}
-                <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Total Fees</span>
-                    <span className="font-bold text-slate-900 tabular-nums">{formatCurrency(sum.totalFees)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Collected</span>
-                    <span className="font-bold text-emerald-700 tabular-nums">{formatCurrency(sum.collected)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">Outstanding</span>
-                    <span className="font-bold text-red-700 tabular-nums">{formatCurrency(sum.outstanding)}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <DataTable<Department>
+        title="Departments"
+        subtitle="Courses, trainers, students and fee collection per department. Click a count to open that list."
+        rows={departments}
+        columns={columns}
+        getRowId={(d) => d.id}
+        searchText={(d) => `${d.code} ${d.name} ${d.description || ''}`}
+        searchPlaceholder="Search departments…"
+        exportFileName="departments"
+        initialSort={{ key: 'name', dir: 'asc' }}
+        actions={isAdmin ? <PrimaryButton onClick={openAdd} icon={<Plus className="w-4 h-4" />}>Add Department</PrimaryButton> : undefined}
+        rowActions={isAdmin ? (dept) => (
+          <>
+            <IconAction title="Edit department" onClick={() => openEdit(dept)}><Edit className="w-4 h-4" /></IconAction>
+            <IconAction
+              title="Delete department"
+              tone="danger"
+              onClick={async () => {
+                if (!window.confirm(`Delete department "${dept.name}"?`)) return;
+                try { await db.deleteDepartment(dept.id); setTick(t => t + 1); } catch (err: any) { alert(err.message); }
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
+            </IconAction>
+          </>
+        ) : undefined}
+        emptyText="No departments yet. Create one, then assign courses and trainers to it."
+      />
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-blue-950/50 backdrop-blur-xs">
           <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
               <h3 className="text-base font-bold">{editing ? 'Edit Department' : 'Add Department'}</h3>
-              <button onClick={() => setShowModal(false)} className="p-1 text-slate-400 hover:text-white">
+              <button onClick={() => setShowModal(false)} className="p-1 text-blue-100 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -192,7 +147,7 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({ onOpenDepartme
                   <input
                     type="text" required value={form.name} placeholder="e.g. IT / Accounting"
                     onChange={e => setForm({ ...form, name: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
                 <div>
@@ -200,7 +155,7 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({ onOpenDepartme
                   <input
                     type="text" value={form.code} placeholder="Auto" disabled={!!editing}
                     onChange={e => setForm({ ...form, code: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600 uppercase disabled:bg-slate-100"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600 uppercase disabled:bg-slate-100"
                   />
                 </div>
               </div>
@@ -209,7 +164,7 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({ onOpenDepartme
                 <textarea
                   rows={2} value={form.description}
                   onChange={e => setForm({ ...form, description: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
               {editing && (
@@ -218,7 +173,7 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({ onOpenDepartme
                   <select
                     value={form.status}
                     onChange={e => setForm({ ...form, status: e.target.value as Department['status'] })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -227,7 +182,7 @@ export const DepartmentsView: React.FC<DepartmentsViewProps> = ({ onOpenDepartme
               )}
               <div className="pt-2 flex justify-end gap-2 border-t">
                 <button type="button" onClick={() => setShowModal(false)} className="px-3 py-1.5 text-slate-600 bg-slate-100 rounded hover:bg-slate-200">Cancel</button>
-                <button type="submit" disabled={saving} className="px-4 py-1.5 text-white font-semibold bg-red-700 hover:bg-red-800 rounded shadow-xs disabled:opacity-60">
+                <button type="submit" disabled={saving} className="px-4 py-1.5 text-white font-semibold bg-blue-700 hover:bg-blue-800 rounded shadow-xs disabled:opacity-60">
                   {saving ? 'Saving…' : editing ? 'Save Department' : 'Create Department'}
                 </button>
               </div>

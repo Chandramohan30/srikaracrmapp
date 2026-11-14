@@ -47,6 +47,22 @@ export function splitAmountIntoTwoInstallments(totalAmount: number): [number, nu
   return [first, second];
 }
 
+// Max number of installments the onboarding form allows
+export const MAX_INSTALLMENTS = 3;
+
+// Split a total into N installments (paise-exact). Any rounding remainder goes to the last one,
+// so the parts always add up to the total.
+export function splitAmountIntoInstallments(totalAmount: number, count: number): number[] {
+  const n = Math.max(1, Math.min(MAX_INSTALLMENTS, Math.floor(count) || 1));
+  const totalPaise = Math.round(totalAmount * 100);
+  const base = Math.floor(totalPaise / n);
+  const parts: number[] = [];
+  for (let i = 0; i < n; i++) {
+    parts.push((i === n - 1 ? totalPaise - base * (n - 1) : base) / 100);
+  }
+  return parts;
+}
+
 // What the student actually owes on an installment right now (ignores any "pay now" arrangement)
 export function getActualDue(inst: { installment_amount: number; paid_amount: number }): number {
   return Math.max(0, round2(inst.installment_amount - inst.paid_amount));

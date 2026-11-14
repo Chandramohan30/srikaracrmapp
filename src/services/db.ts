@@ -3,10 +3,10 @@ import {
   LeaveApplication, ClassSchedule, AuditLog, ManualInstallmentInput,
   UserRole, Department
 } from '../types/crm';
-import { getMonthNamesFromDate, splitAmountIntoTwoInstallments } from '../server/finance';
+import { getMonthNamesFromDate, splitAmountIntoTwoInstallments, splitAmountIntoInstallments, MAX_INSTALLMENTS } from '../server/finance';
 
 // Re-exported so existing components keep working unchanged
-export { getMonthNamesFromDate, splitAmountIntoTwoInstallments };
+export { getMonthNamesFromDate, splitAmountIntoTwoInstallments, splitAmountIntoInstallments, MAX_INSTALLMENTS };
 
 // ---------------------------------------------------------------------------
 // API client (all data now comes from the Express + MongoDB Atlas backend)
@@ -42,6 +42,24 @@ export const authToken = {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Global loading tracker: counts in-flight API calls so the top loading bar
+// can show whenever the app is talking to the server.
+// ---------------------------------------------------------------------------
+let pendingRequests = 0;
+const loadingListeners = new Set<(busy: boolean) => void>();
+const emitLoading = () => loadingListeners.forEach(fn => fn(pendingRequests > 0));
+
+export const loadingTracker = {
+  start: () => { pendingRequests++; emitLoading(); },
+  done: () => { pendingRequests = Math.max(0, pendingRequests - 1); emitLoading(); },
+  isBusy: () => pendingRequests > 0,
+  subscribe: (fn: (busy: boolean) => void) => {
+    loadingListeners.add(fn);
+    return () => { loadingListeners.delete(fn); };
+  }
+};
+
 // One refresh at a time: parallel requests that all get a 401 share the same refresh call
 let refreshInFlight: Promise<boolean> | null = null;
 
@@ -73,6 +91,15 @@ async function refreshSession(): Promise<boolean> {
 
 /** fetch() with the Bearer token; on 401 it refreshes the session once and retries */
 export async function authedFetch(method: string, url: string, body?: unknown): Promise<Response> {
+  loadingTracker.start();
+  try {
+    return await authedFetchInner(method, url, body);
+  } finally {
+    loadingTracker.done();
+  }
+}
+
+async function authedFetchInner(method: string, url: string, body?: unknown): Promise<Response> {
   const send = () => {
     const token = authToken.getAccess();
     return fetch(url, {
@@ -324,6 +351,7 @@ class DatabaseService {
     trainer_id: string;
     joining_date: string;
     expected_completion_date?: string;
+    installments?: { amount: number; due_date: string; manual?: boolean; subs?: { amount: number; due_date: string }[] }[];
   }, _actor?: User): Promise<{ student: Student; installments: Installment[] }> {
     const result = await api<{ student: Student; installments: Installment[] }>('POST', '/api/students', data);
     await this.load();
@@ -501,25 +529,31 @@ class DatabaseService {
 
   // --- KPI & DASHBOARD METRICS ---
   /**
-   * Dashboard numbers, optionally narrowed by department and/or period.
+   * Dashboard numbers for a department and an optional date range.
    *  - department: '' / 'all' = every department
-   *  - year: 0 = all years
-   *  - month: 0 = whole year (1-12 = that month); only used together with a year
+   *  - from / to: inclusive 'YYYY-MM-DD' (either may be empty = open-ended)
    * Students are matched by their joining date, payments by payment date,
    * installments by due date. With no filters everything is counted.
    */
-  public getDashboardMetrics(filters: { department?: string; year?: number; month?: number } = {}) {
+  public getDashboardMetrics(filters: { department?: string; from?: string; to?: string } = {}) {
     const deptId = filters.department && filters.department !== 'all' ? filters.department : '';
-    const year = filters.year || 0;
-    const month = year ? (filters.month || 0) : 0;
+    const from = filters.from || '';
+    const to = filters.to || '';
+    const hasPeriod = !!(from || to);
 
-    const inPeriod = (dateStr: string | undefined): boolean => {
-      if (!year) return true;
-      if (!dateStr) return false;
+    // Local calendar date of any stored date/ISO string, as 'YYYY-MM-DD'
+    const dayOf = (dateStr: string): string => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
       const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return false;
-      if (d.getFullYear() !== year) return false;
-      return !month || d.getMonth() + 1 === month;
+      if (isNaN(d.getTime())) return '';
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const inPeriod = (dateStr: string | undefined): boolean => {
+      if (!hasPeriod) return true;
+      if (!dateStr) return false;
+      const day = dayOf(dateStr);
+      if (!day) return false;
+      return (!from || day >= from) && (!to || day <= to);
     };
 
     const allStudents = this.state.students;
@@ -539,7 +573,6 @@ class DatabaseService {
       deptStudentIds.has(i.student_id) && inPeriod(i.due_date)
     );
 
-    const leaves = this.state.leaves.filter(l => deptStudentIds.has(l.student_id));
     const trainers = deptId
       ? this.state.trainers.filter(t => t.department_id === deptId)
       : this.state.trainers;
@@ -555,7 +588,7 @@ class DatabaseService {
 
     let totalRevenue: number;
     let totalOutstanding: number;
-    if (!year) {
+    if (!hasPeriod) {
       // No period selected: whole-life numbers for the department (or everything)
       totalRevenue = students.reduce((sum, s) => sum + s.total_course_amount, 0);
       totalOutstanding = Math.max(0, totalRevenue - amountCollected);
@@ -568,10 +601,8 @@ class DatabaseService {
     const partialPaymentsCount = students.filter(s => s.payment_status === 'partially_paid').length;
 
     const studentsWithDuesCount = students.filter(s =>
-      this.state.installments.some(i => i.student_id === s.id && i.due_amount > 0 && (!year || inPeriod(i.due_date)))
+      this.state.installments.some(i => i.student_id === s.id && i.due_amount > 0 && inPeriod(i.due_date))
     ).length;
-
-    const pendingLeaveRequests = leaves.filter(l => l.status === 'pending').length;
 
     // Per-course enrolment inside the selected department / period
     const courseMap = new Map<string, { id: string; name: string; students: number; price: number }>();
@@ -585,7 +616,7 @@ class DatabaseService {
     });
     const courseBreakdown = Array.from(courseMap.values());
 
-    // Collections trend: 12 months of the selected year, or the last 5 months by default
+    // Collections trend: every month in the selected range (max last 12), or the last 5 months by default
     const monthShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const deptPayments = this.state.payments.filter(p => p.payment_status === 'success' && deptStudentIds.has(p.student_id));
     const sumFor = (y: number, m: number) => deptPayments
@@ -596,11 +627,17 @@ class DatabaseService {
       .reduce((sum, p) => sum + p.amount, 0);
 
     const monthlyCollections: { month: string; amount: number }[] = [];
-    if (year) {
-      for (let m = 0; m < 12; m++) {
-        if (month && m + 1 !== month) continue;
-        monthlyCollections.push({ month: `${monthShort[m]} ${year}`, amount: sumFor(year, m) });
+    if (hasPeriod) {
+      const today = new Date();
+      const start = from ? new Date(`${from}T00:00:00`) : new Date(`${to}T00:00:00`);
+      const end = to ? new Date(`${to}T00:00:00`) : today;
+      const months: { y: number; m: number }[] = [];
+      for (let d = new Date(start.getFullYear(), start.getMonth(), 1); d <= end; d.setMonth(d.getMonth() + 1)) {
+        months.push({ y: d.getFullYear(), m: d.getMonth() });
       }
+      months.slice(-12).forEach(({ y, m }) => {
+        monthlyCollections.push({ month: `${monthShort[m]} ${y}`, amount: sumFor(y, m) });
+      });
     } else {
       const now = new Date();
       for (let i = 4; i >= 0; i--) {
@@ -621,7 +658,6 @@ class DatabaseService {
       totalOutstanding,
       partialPaymentsCount,
       studentsWithDuesCount,
-      pendingLeaveRequests,
       courseBreakdown,
       monthlyCollections
     };

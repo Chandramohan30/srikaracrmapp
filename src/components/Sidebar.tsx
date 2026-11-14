@@ -1,8 +1,7 @@
 import React from 'react';
 import { 
   LayoutDashboard, Users, BookOpen, GraduationCap, CreditCard, 
-  CalendarClock, Calendar, FileText, Settings, UserCheck, 
-  Clock, ShieldAlert, LogOut, ChevronRight, Building2
+  Settings, Clock, LogOut, Building2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SrikaraLogo } from './SrikaraLogo';
@@ -15,10 +14,6 @@ export type NavTab =
   | 'trainers'
   | 'payments'
   | 'installments'
-  | 'leaves'
-  | 'schedules'
-  | 'calendar'
-  | 'reports'
   | 'settings'
   | 'profile';
 
@@ -27,7 +22,6 @@ interface SidebarProps {
   onSelectTab: (tab: NavTab) => void;
   isOpen: boolean;
   onClose: () => void;
-  pendingLeavesCount?: number;
   duesCount?: number;
 }
 
@@ -36,7 +30,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   isOpen,
   onClose,
-  pendingLeavesCount = 0,
   duesCount = 0
 }) => {
   const { currentUser, isAdmin, isTrainer, isStudent, logout } = useAuth();
@@ -52,10 +45,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'trainers', label: 'Trainers', icon: GraduationCap },
         { id: 'payments', label: 'Payments', icon: CreditCard },
         { id: 'installments', label: 'Installments', icon: Clock, badge: duesCount > 0 ? `${duesCount} Dues` : undefined, badgeColor: 'bg-red-100 text-red-700 border-red-200' },
-        { id: 'leaves', label: 'Leave Management', icon: UserCheck, badge: pendingLeavesCount > 0 ? `${pendingLeavesCount}` : undefined, badgeColor: 'bg-amber-100 text-amber-800 border-amber-200' },
-        { id: 'schedules', label: 'Class Schedule', icon: CalendarClock },
-        { id: 'calendar', label: 'Google Calendar', icon: Calendar },
-        { id: 'reports', label: 'Reports', icon: FileText },
         { id: 'settings', label: 'Settings', icon: Settings },
       ];
     }
@@ -64,9 +53,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'students', label: 'My Students', icon: Users },
-        { id: 'schedules', label: 'Class Schedule', icon: CalendarClock },
-        { id: 'calendar', label: 'Google Calendar', icon: Calendar },
-        { id: 'leaves', label: 'Leave Information', icon: UserCheck },
       ];
     }
 
@@ -75,10 +61,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'profile', label: 'My Profile', icon: Users },
       { id: 'courses', label: 'My Course', icon: BookOpen },
+      { id: 'trainers', label: 'My Trainer', icon: GraduationCap },
       { id: 'payments', label: 'Payments', icon: CreditCard, badge: duesCount > 0 ? 'Due' : undefined, badgeColor: 'bg-red-100 text-red-700 border-red-200' },
-      { id: 'leaves', label: 'Leave', icon: UserCheck },
-      { id: 'schedules', label: 'Class Schedule', icon: CalendarClock },
-      { id: 'calendar', label: 'Calendar', icon: Calendar },
     ];
   };
 
@@ -89,28 +73,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Backdrop */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-xs transition-opacity"
+          className="fixed inset-0 bg-blue-950/50 z-40 md:hidden backdrop-blur-xs transition-opacity"
           onClick={onClose}
         />
       )}
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col w-64 bg-slate-900 text-slate-100 border-r border-slate-800 transition-transform duration-200 ease-in-out shrink-0 ${
+        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col w-64 bg-white text-slate-700 border-r border-slate-200 shadow-[2px_0_12px_-6px_rgba(30,64,175,0.15)] transition-transform duration-200 ease-in-out shrink-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
         {/* Brand Header */}
-        <div className="p-4 border-b border-slate-800 bg-slate-950/40">
-          <SrikaraLogo variant="horizontal" size="sm" theme="dark" />
+        <div className="px-4 py-3 flex items-center justify-center border-b border-slate-100">
+          <SrikaraLogo variant="horizontal" size="lg" />
         </div>
-
-       
         
-       
 
         {/* Navigation Links */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 pb-4 pt-1 space-y-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
@@ -123,14 +104,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClose();
                   }
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`group w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-red-700 text-white shadow-sm shadow-red-950/50'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25 font-semibold'
+                    : 'text-slate-600 hover:text-blue-700 hover:bg-blue-50'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-600'}`} />
                   <span className="truncate">{item.label}</span>
                 </div>
                 {item.badge && (
@@ -146,18 +127,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
 
         {/* Bottom User Info & Sign Out (No profile switcher) */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950/60">
-          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+        <div className="p-3 border-t border-slate-100">
+          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl bg-slate-50 border border-slate-200">
             <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-white text-xs ${
-              isAdmin ? 'bg-red-700' : isTrainer ? 'bg-amber-600' : 'bg-emerald-600'
+              isAdmin ? 'bg-blue-600' : isTrainer ? 'bg-amber-600' : 'bg-emerald-600'
             }`}>
               {currentUser.name.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold text-slate-200 truncate">
+              <div className="text-xs font-semibold text-slate-800 truncate">
                 {currentUser.name}
               </div>
-              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-mono">
+              <div className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
                 {currentUser.role}
               </div>
             </div>
@@ -166,9 +147,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Logout Button */}
           <button
             onClick={logout}
-            className="w-full mt-2.5 flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-slate-900 hover:bg-slate-800 rounded-lg border border-slate-800 transition-colors"
+            className="w-full mt-2.5 flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 hover:text-red-600 bg-white hover:bg-red-50 rounded-lg border border-slate-200 hover:border-red-200 transition-colors"
           >
-            <LogOut className="w-3.5 h-3.5 text-red-500" />
+            <LogOut className="w-3.5 h-3.5" />
             <span>Sign Out</span>
           </button>
         </div>

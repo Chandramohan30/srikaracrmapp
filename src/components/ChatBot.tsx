@@ -78,9 +78,9 @@ push('bot', res.reply);
             {open && (
                 <div className="fixed z-50 bottom-20 right-4 sm:right-6 w-[calc(100vw-2rem)] sm:w-96 h-[32rem] max-h-[calc(100vh-7rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
                     {/* Header */}
-                    <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                    <div className="px-4 py-3 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between shrink-0">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-red-700 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-blue-700 flex items-center justify-center">
                                 <Bot className="w-4 h-4" />
                             </div>
                             <div>
@@ -122,7 +122,7 @@ push('bot', res.reply);
                             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div
                                     className={`max-w-[85%] px-3 py-2 rounded-2xl text-[13px] leading-relaxed whitespace-pre-wrap break-words ${m.role === 'user'
-                                        ? 'bg-red-700 text-white rounded-br-sm'
+                                        ? 'bg-blue-700 text-white rounded-br-sm'
                                         : m.isError
                                             ? 'bg-red-50 text-red-700 border border-red-200 rounded-bl-sm'
                                             : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
@@ -152,13 +152,13 @@ push('bot', res.reply);
                                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
                                 maxLength={2000}
                                 placeholder="Type your question..."
-                                className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600"
+                                className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
                             />
                             <button
                                 onClick={send}
                                 disabled={!input.trim() || sending}
                                 aria-label="Send message"
-                                className="p-2.5 bg-red-700 hover:bg-red-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                                className="p-2.5 bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
                             >
                                 <Send className="w-4 h-4" />
                             </button>
@@ -172,7 +172,7 @@ push('bot', res.reply);
                 onClick={() => setOpen(o => !o)}
                 aria-label={open ? 'Close AI assistant' : 'Open AI assistant'}
                 title="Ask the AI assistant"
-                className="fixed z-50 bottom-4 right-4 sm:right-6 w-14 h-14 rounded-full bg-red-700 hover:bg-red-800 text-white shadow-xl flex items-center justify-center transition-transform hover:scale-105"
+                className="fixed z-50 bottom-4 right-4 sm:right-6 w-14 h-14 rounded-full bg-blue-700 hover:bg-blue-800 text-white shadow-xl flex items-center justify-center transition-transform hover:scale-105"
             >
                 {open ? <X className="w-6 h-6" /> : <Bot className="w-7 h-7" />}
 

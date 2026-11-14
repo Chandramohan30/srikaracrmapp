@@ -21,6 +21,7 @@ import { startFollowUpScheduler, startFollowUp, syncFollowUpWithStudent } from '
 import { registerAgentRoutes } from './src/server/agentRoutes.js';
 import {
   round2, getMonthNamesFromDate, splitAmountIntoTwoInstallments, computeInstallmentStatus,
+  splitAmountIntoInstallments, MAX_INSTALLMENTS,
   getActualDue, getPayableNow, getDisplayDue
 } from './src/server/finance.js';
 
@@ -186,6 +187,165 @@ async function refreshOverdue() {
   }).select('student_id');
   const studentIds = [...new Set(candidates.map(c => c.student_id))];
   for (const sid of studentIds) await recalcStudent(sid);
+}
+
+// ---------------------------------------------------------------------------
+// Course-fee cap: a student's installments (incl. manual / sub) can never add up to
+// more than the course fee. Throws 400 if existing + adding would go beyond it.
+// ---------------------------------------------------------------------------
+async function assertWithinCourseFee(student: any, existingTotal: number, adding: number) {
+  const course: any = student.course_id ? await CourseModel.findOne({ id: student.course_id }).lean() : null;
+  const cap = round2(Number(course?.base_price ?? student.total_course_amount ?? 0));
+  const newTotal = round2(existingTotal + adding);
+  if (cap > 0 && newTotal > cap + 0.009) {
+    const room = Math.max(0, round2(cap - existingTotal));
+    throw new HttpError(400, `Installments would total ₹${newTotal}, more than the course fee (₹${cap}). You can add at most ₹${room}.`);
+  }
+}
+
+async function installmentsTotal(studentId: string, excludeId?: string): Promise<number> {
+  const rows: any[] = await InstallmentModel.find({ student_id: studentId }).lean();
+  return round2(rows.filter(r => r.id !== excludeId).reduce((sum, r) => sum + (r.installment_amount || 0), 0));
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding installment plan
+// Admin may send `installments: [{ amount, due_date }]` (1..MAX_INSTALLMENTS rows).
+// Amounts are editable but MUST add up exactly to the course fee.
+// Nothing sent -> default automatic 2-way split (old behaviour).
+// ---------------------------------------------------------------------------
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+type PlanRow = {
+  kind: 'auto' | 'manual';
+  amount: number;
+  dueDate: string;
+  month: string;
+  subs: { amount: number; dueDate: string; month: string }[];
+};
+
+const MAX_MANUAL_INSTALLMENTS = 6;
+const MAX_SUBS_PER_INSTALLMENT = 6;
+
+// Payload: installments: [{ amount, due_date, manual?: boolean, subs?: [{ amount, due_date }] }]
+//  - up to MAX_INSTALLMENTS auto (planned) rows, each may carry sub-installments
+//    (when the admin lowers an installment, the balance becomes Installment N.1, N.2 ... with own dates)
+//  - optional manual rows (is_manual) to cover any amount not yet planned
+//  - everything together must equal the course fee exactly (never more, never less)
+function buildInstallmentPlan(raw: any, total: number, joiningDate: string): PlanRow[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    const amounts = splitAmountIntoTwoInstallments(total);
+    const months = getMonthNamesFromDate(joiningDate, 2);
+    return amounts.map((amount, i) => ({ kind: 'auto', amount, month: months[i].month, dueDate: months[i].dueDate, subs: [] }));
+  }
+
+  const parseDate = (v: any, label: string) => {
+    const dueDate = String(v || '');
+    const dt = new Date(dueDate);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || isNaN(dt.getTime())) {
+      throw new HttpError(400, `${label}: a valid due date (YYYY-MM-DD) is required.`);
+    }
+    return { dueDate, month: `${MONTH_NAMES[dt.getUTCMonth()]} ${dt.getUTCFullYear()}` };
+  };
+  const parseAmount = (v: any, label: string) => {
+    const amount = round2(Number(v));
+    if (!Number.isFinite(amount) || amount <= 0) throw new HttpError(400, `${label}: amount must be greater than 0.`);
+    return amount;
+  };
+
+  const autoCount = raw.filter((r: any) => !r?.manual).length;
+  const manualCount = raw.length - autoCount;
+  if (autoCount < 1 || autoCount > MAX_INSTALLMENTS) {
+    throw new HttpError(400, `Choose between 1 and ${MAX_INSTALLMENTS} installments.`);
+  }
+  if (manualCount > MAX_MANUAL_INSTALLMENTS) {
+    throw new HttpError(400, `A maximum of ${MAX_MANUAL_INSTALLMENTS} manual installments is allowed.`);
+  }
+
+  let autoNo = 0;
+  let manualNo = 0;
+  const plan: PlanRow[] = raw.map((r: any) => {
+    const manual = !!r?.manual;
+    const label = manual ? `Manual installment ${++manualNo}` : `Installment ${++autoNo}`;
+    const amount = parseAmount(r?.amount, label);
+    const { dueDate, month } = parseDate(r?.due_date, label);
+    const rawSubs = manual ? [] : (Array.isArray(r?.subs) ? r.subs : []);
+    if (rawSubs.length > MAX_SUBS_PER_INSTALLMENT) {
+      throw new HttpError(400, `${label}: a maximum of ${MAX_SUBS_PER_INSTALLMENT} sub-installments is allowed.`);
+    }
+    const subs = rawSubs.map((sub: any, k: number) => {
+      const subLabel = `${label}.${k + 1}`;
+      const subAmount = parseAmount(sub?.amount, subLabel);
+      const d = parseDate(sub?.due_date, subLabel);
+      if (d.dueDate < dueDate) throw new HttpError(400, `${subLabel}: due date cannot be before ${label} (${dueDate}).`);
+      return { amount: subAmount, ...d };
+    });
+    return { kind: manual ? 'manual' : 'auto', amount, dueDate, month, subs };
+  });
+
+  const autoRows = plan.filter(p => p.kind === 'auto');
+  for (let i = 1; i < autoRows.length; i++) {
+    if (autoRows[i].dueDate < autoRows[i - 1].dueDate) {
+      throw new HttpError(400, `Installment ${i + 1} due date cannot be before installment ${i}.`);
+    }
+  }
+
+  const toPaise = (n: number) => Math.round(n * 100);
+  const sumPaise = plan.reduce((sum, p) => sum + toPaise(p.amount) + p.subs.reduce((t, x) => t + toPaise(x.amount), 0), 0);
+  const feePaise = toPaise(total);
+  if (sumPaise > feePaise) {
+    throw new HttpError(400, `Installments (₹${sumPaise / 100}) cannot be more than the course fee (₹${round2(total)}).`);
+  }
+  if (sumPaise < feePaise) {
+    throw new HttpError(400, `Installments (₹${sumPaise / 100}) are ₹${(feePaise - sumPaise) / 100} short of the course fee (₹${round2(total)}). Add a sub-installment or a manual installment for the balance.`);
+  }
+  return plan;
+}
+
+// Turns a validated plan into Installment documents (main -> its subs -> next main ... -> manual rows)
+function planToInstallmentDocs(plan: PlanRow[], base: Record<string, any>) {
+  const docs: any[] = [];
+  let number = 0;
+  for (const row of plan) {
+    number += 1;
+    const isManual = row.kind === 'manual';
+    const mainId = `inst-${isManual ? 'm-' : ''}${shortId()}`;
+    const mainName = isManual ? `Manual Installment ${number}` : `Installment ${number}`;
+    docs.push({
+      ...base,
+      id: mainId,
+      installment_number: number,
+      name: mainName,
+      month: row.month,
+      installment_amount: row.amount,
+      paid_amount: 0,
+      due_amount: row.amount,
+      due_date: row.dueDate,
+      status: 'pending',
+      is_manual: isManual,
+      notes: isManual ? 'Manual installment added at onboarding' : undefined
+    });
+    row.subs.forEach((sub, k) => {
+      docs.push({
+        ...base,
+        id: `inst-s-${shortId()}`,
+        installment_number: number,
+        sub_number: k + 1,
+        parent_installment_id: mainId,
+        name: `Installment ${number}.${k + 1}`,
+        month: sub.month,
+        installment_amount: sub.amount,
+        paid_amount: 0,
+        due_amount: sub.amount,
+        due_date: sub.dueDate,
+        status: 'pending',
+        is_manual: false,
+        notes: `Balance of ${mainName}, set at onboarding`
+      });
+    });
+  }
+  return docs;
 }
 
 // ---------------------------------------------------------------------------
@@ -387,7 +547,9 @@ async function startServer() {
 
     const user: any = await UserModel.findOne(query).select('+password_hash');
     if (!user) {
-      throw new HttpError(401, `Invalid credentials or no ${role || ''} account found for "${email}".`.replace('  ', ' '));
+      throw new HttpError(401, role
+        ? `Invalid credentials or no ${role} account found for "${email}".`
+        : `No account found for "${email}". Please check your email address.`);
     }
     if (user.status === 'inactive') {
       throw new HttpError(403, 'This account is inactive. Please contact the academy admin.');
@@ -459,8 +621,7 @@ async function startServer() {
     res.json({ user: clean(req.user) });
   }));
 
-  // --- BOOTSTRAP: everything the logged-in role is allowed to see ---
-  app.get('/api/bootstrap', authenticate, wrap(async (req, res) => {
+ app.get('/api/bootstrap', authenticate, wrap(async (req, res) => {
     const user = req.user;
     await refreshOverdue();
 
@@ -471,8 +632,6 @@ async function startServer() {
 
     const sort = { created_at: -1 } as any;
     const departments = await DepartmentModel.find().sort({ name: 1 }).lean();
-    const courses = await CourseModel.find().sort(sort).lean();
-    const trainers = await TrainerModel.find().sort(sort).lean();
 
     let students: any[], installments: any[], payments: any[], leaves: any[], schedules: any[];
     let auditLogs: any[] = [];
@@ -500,6 +659,21 @@ async function startServer() {
       leaves = await LeaveModel.find({ student_id: sid }).sort(sort).lean();
       schedules = await ScheduleModel.find({ student_id: sid }).sort({ class_date: 1, start_time: 1 }).lean();
     }
+
+    // Courses: a student with a course_id gets only that course; everyone else gets all courses
+    const studentCourseId = user.role === 'student' ? students[0]?.course_id : undefined;
+    const courses = studentCourseId
+      ? await CourseModel.find({ id: studentCourseId }).lean()
+      : await CourseModel.find().sort(sort).lean();
+
+    // Trainers: a student gets only their own trainer, a trainer gets only themselves; admin gets all
+    const trainerFilterId =
+      user.role === 'student' ? students[0]?.trainer_id :
+      user.role === 'trainer' ? user.trainer_id :
+      undefined;
+    const trainers = trainerFilterId
+      ? await TrainerModel.find({ id: trainerFilterId }).lean()
+      : await TrainerModel.find().sort(sort).lean();
 
     res.json({
       users: [clean(user)],
@@ -787,28 +961,18 @@ async function startServer() {
         total_outstanding: course.base_price
       });
 
-      const amounts = splitAmountIntoTwoInstallments(course.base_price);
-      const months = getMonthNamesFromDate(d.joining_date, 2);
-      const installments = await InstallmentModel.insertMany(
-        amounts.map((amt, i) => ({
-          id: `inst-${shortId()}`,
-          student_id: studentId,
-          student_name: fullName,
-          student_code: studentCode,
-          course_name: course.course_name,
-          installment_number: i + 1,
-          name: `Installment ${i + 1}`,
-          month: months[i].month,
-          installment_amount: amt,
-          paid_amount: 0,
-          due_amount: amt,
-          due_date: months[i].dueDate,
-          status: 'pending'
-        }))
-      );
+      const plan = buildInstallmentPlan(d.installments, course.base_price, d.joining_date);
+      const docs = planToInstallmentDocs(plan, {
+        student_id: studentId,
+        student_name: fullName,
+        student_code: studentCode,
+        course_name: course.course_name
+      });
+      const installments = await InstallmentModel.insertMany(docs);
+      const amounts = docs.map(x => `${x.name}: ₹${x.installment_amount} (due ${x.due_date})`);
 
       await logAudit(req.user, 'ONBOARD_STUDENT', 'Student', studentId, undefined,
-        `Onboarded ${fullName} (${studentCode}) for ${course.course_name} (₹${course.base_price}). 2 installments created: ₹${amounts[0]}, ₹${amounts[1]}. Assigned to ${trainer.name}.`);
+        `Onboarded ${fullName} (${studentCode}) for ${course.course_name} (₹${course.base_price}). ${docs.length} installment(s) created: ${amounts.join(', ')}. Assigned to ${trainer.name}.`);
 
       await recalcStudent(studentId);
       await recalcTrainer(trainer.id);
@@ -894,6 +1058,8 @@ async function startServer() {
 
     const student: any = await StudentModel.findOne({ id: student_id });
     if (!student) throw new HttpError(404, 'Student not found');
+    const existingTotal = await installmentsTotal(student.id);
+    await assertWithinCourseFee(student, existingTotal, amt);
 
     const count = await InstallmentModel.countDocuments({ student_id });
     const inst = await InstallmentModel.create({
@@ -936,6 +1102,10 @@ async function startServer() {
       if (isNaN(amt) || amt < 0) throw new HttpError(400, 'Invalid installment amount.');
       if (amt < inst.paid_amount) {
         throw new HttpError(400, `Cannot set installment amount less than already paid amount (₹${inst.paid_amount})`);
+      }
+      if (amt > inst.installment_amount) {
+        const owner: any = await StudentModel.findOne({ id: inst.student_id });
+        if (owner) await assertWithinCourseFee(owner, await installmentsTotal(inst.student_id, inst.id), amt);
       }
       inst.installment_amount = amt;
     }

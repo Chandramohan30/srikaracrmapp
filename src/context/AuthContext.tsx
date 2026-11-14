@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { User, UserRole } from '../types/crm';
+import { User } from '../types/crm';
 import { db, api, authToken, revokeSession } from '../services/db';
 
 interface AuthContextType {
   currentUser: User;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (role: UserRole, email: string, password?: string) => Promise<{ success: boolean; user?: User; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; user?: User; error?: string }>;
   logout: () => void;
   users: User[];
   isAdmin: boolean;
@@ -74,14 +74,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener('srikara:unauthorized', onUnauthorized);
   }, [logout]);
 
+  // Email + password only. The server finds the account, returns JWT-style
+  // access/refresh tokens and the user (with role) -> UI redirects by role.
   const login = async (
-    role: UserRole,
     email: string,
-    password?: string
+    password: string
   ): Promise<{ success: boolean; user?: User; error?: string }> => {
     try {
       const res = await api<{ accessToken: string; refreshToken: string; user: User }>('POST', '/api/auth/login', {
-        role,
         email: email.trim(),
         password: password || ''
       });

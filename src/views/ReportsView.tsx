@@ -64,7 +64,7 @@ export const ReportsView: React.FC = () => {
           </button>
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-red-700 hover:bg-red-800 rounded-lg shadow-2xs transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-2xs transition-colors"
           >
             <Printer className="w-3.5 h-3.5" />
             Print Report

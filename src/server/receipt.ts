@@ -1,4 +1,11 @@
-import PDFDocument from 'pdfkit';
+import { createRequire } from 'node:module';
+
+// Load pdfkit through CommonJS on purpose. Importing it as an ES module makes tsx scan
+// `linebreak/dist/module.mjs`, and some tsx + Node versions (e.g. Node 24 on Windows)
+// crash on that file with "Parse error ... linebreak/dist/module.mjs".
+// require() loads the CommonJS builds (pdfkit/js/pdfkit.js, linebreak/dist/main.cjs) instead.
+const require = createRequire(import.meta.url);
+const PDFDocument: typeof import('pdfkit') = require('pdfkit');
 
 export interface ReceiptData {
   receipt_number: string;

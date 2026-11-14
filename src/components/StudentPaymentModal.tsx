@@ -296,12 +296,12 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-blue-950/50 backdrop-blur-xs overflow-y-auto">
       <div className="relative w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="px-6 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-700/80 rounded-lg text-white">
+            <div className="p-2 bg-blue-500/80 rounded-lg text-white">
               <CreditCard className="w-5 h-5" />
             </div>
             <div>
@@ -309,18 +309,18 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                 <h2 className="text-base font-bold text-white leading-tight">
                   Student Payment Details
                 </h2>
-                <span className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">
+                <span className="text-xs bg-slate-800 text-blue-100 px-2 py-0.5 rounded font-mono">
                   {student.student_code}
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-blue-100">
                 {student.full_name} · {student.course_name}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-1.5 text-blue-100 hover:text-white hover:bg-white/15 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -393,10 +393,10 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
               {isAdmin && (
                 <button
                   onClick={() => setShowManualModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  + Manual Installment
+                  Manual Installment
                 </button>
               )}
             </div>
@@ -424,10 +424,14 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                           hasDue && inst.status === 'overdue' ? 'bg-red-50/20' : ''
                         }`}
                       >
-                        <td className="py-3 px-3.5 font-medium text-slate-900">
+                        <td className={`py-3 font-medium text-slate-900 ${inst.parent_installment_id || inst.sub_number ? 'pl-8 pr-3.5 bg-blue-50/40' : 'px-3.5'}`}>
                           <div className="flex items-center gap-1.5">
+                            {(inst.parent_installment_id || inst.sub_number) ? <span className="text-blue-500">↳</span> : null}
                             <span>{inst.name || `Installment ${inst.installment_number}`}</span>
-                            {inst.is_manual && (
+                            {(inst.parent_installment_id || inst.sub_number) ? (
+                              <span className="text-[9px] bg-blue-100 text-blue-700 font-bold px-1 rounded">Sub</span>
+                            ) : null}
+                            {inst.is_manual && !(inst.parent_installment_id || inst.sub_number) && (
                               <span className="text-[9px] bg-purple-100 text-purple-700 font-bold px-1 rounded">
                                 Manual
                               </span>
@@ -505,7 +509,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                                 onClick={() => handleInitiatePayment(inst)}
                                 disabled={!!getBlockingInstallment(inst)}
                                 title={getBlockingInstallment(inst) ? 'Clear the previous installment due first' : ''}
-                                className="px-2.5 py-1 text-xs font-semibold text-white bg-red-700 hover:bg-red-800 rounded shadow-2xs transition-colors whitespace-nowrap disabled:bg-slate-300 disabled:cursor-not-allowed"
+                                className="px-2.5 py-1 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 rounded shadow-2xs transition-colors whitespace-nowrap disabled:bg-slate-300 disabled:cursor-not-allowed"
                               >
                                 {getBlockingInstallment(inst) ? 'Locked' : 'Make Payment'}
                               </button>
@@ -582,7 +586,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                           <td className="py-2.5 px-3.5 text-center">
                             <button
                               onClick={() => setReceiptFor(p)}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-slate-700 hover:text-red-700 hover:bg-slate-100 border border-slate-200 rounded text-[11px] transition-colors"
+                              className="inline-flex items-center gap-1 px-2 py-1 text-slate-700 hover:text-blue-700 hover:bg-blue-50 border border-slate-200 rounded text-[11px] transition-colors"
                             >
                               <FileText className="w-3 h-3" />
                               Receipt
@@ -614,18 +618,18 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
 
         {/* --- SUB-MODAL 1: UPI CHECKOUT (pay -> upload screenshot -> verify) --- */}
         {selectedInstallment && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-slate-950/70 backdrop-blur-xs">
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-blue-950/55 backdrop-blur-xs">
             <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden max-h-[94vh] flex flex-col">
-              <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between shrink-0">
                 <div>
                   <h4 className="text-sm font-bold text-white">
                     {payStep === 'pay' ? 'Pay via UPI' : 'Upload Payment Screenshot'}
                   </h4>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-blue-100">
                     Step {payStep === 'pay' ? '1' : '2'} of 2 · Srikara Training & Placement Academy
                   </p>
                 </div>
-                <button onClick={closeCheckout} className="p-1 text-slate-400 hover:text-white">
+                <button onClick={closeCheckout} className="p-1 text-blue-100 hover:text-white">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -649,9 +653,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label className="text-xs font-semibold text-slate-700">Amount to Pay (INR)</label>
-                          <span className="text-[10px] bg-red-100 text-red-800 font-bold px-1.5 py-0.5 rounded border border-red-200">
-                            Admin: Amount is Editable
-                          </span>
+                          
                         </div>
                         <div className="relative">
                           <span className="absolute left-3 top-2.5 text-sm font-bold text-slate-400">₹</span>
@@ -661,7 +663,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                             min="1"
                             value={customPayAmount}
                             onChange={(e) => setCustomPayAmount(parseFloat(e.target.value) || 0)}
-                            className="w-full pl-8 pr-3 py-2 text-sm font-bold text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none tabular-nums"
+                            className="w-full pl-8 pr-3 py-2 text-sm font-bold text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none tabular-nums"
                           />
                         </div>
                         <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500">
@@ -669,7 +671,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                           <button
                             type="button"
                             onClick={() => setCustomPayAmount(getActualDue(selectedInstallment))}
-                            className="text-red-700 hover:underline font-semibold"
+                            className="text-blue-700 hover:underline font-semibold"
                           >
                             Reset to Full Due
                           </button>
@@ -682,10 +684,6 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                             <Lock className="w-3.5 h-3.5 text-slate-500" />
                             <span>Amount to Pay (Fixed)</span>
                           </label>
-                          <span className="text-[10px] bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded border border-slate-200 flex items-center gap-1">
-                            <Lock className="w-2.5 h-2.5 text-slate-400" />
-                            <span>Editable only by Admin</span>
-                          </span>
                         </div>
                         <div className="relative">
                           <span className="absolute left-3 top-2.5 text-sm font-bold text-slate-500">₹</span>
@@ -780,7 +778,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                         value={utr}
                         onChange={(e) => setUtr(e.target.value.replace(/\D/g, ''))}
                         placeholder="e.g. 412345678901"
-                        className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-red-600 outline-none"
+                        className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none"
                       />
                     </div>
                   </>
@@ -807,7 +805,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                       <button
                         onClick={handleVerifyPayment}
                         disabled={!proofPreview || isProcessingPayment || isReadingProof}
-                        className="w-full py-2.5 px-4 bg-red-700 hover:bg-red-800 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold text-xs rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-2.5 px-4 bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-bold text-xs rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
                       >
                         {isProcessingPayment ? (
                           <><Loader2 className="w-4 h-4 animate-spin" /><span>Verifying...</span></>
@@ -835,7 +833,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
 
         {/* --- SUB-MODAL 2: PAYMENT SUCCESS --- */}
         {completedPayment && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-slate-950/70 backdrop-blur-xs">
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-blue-950/55 backdrop-blur-xs">
             <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden text-center p-6">
               <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-3">
                 <CheckCircle className="w-7 h-7" />
@@ -883,7 +881,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                 )}
                 <button
                   onClick={() => setCompletedPayment(null)}
-                  className="flex-1 py-2 px-3 bg-red-700 hover:bg-red-800 text-white font-semibold text-xs rounded-lg transition-colors"
+                  className="flex-1 py-2 px-3 bg-blue-700 hover:bg-blue-800 text-white font-semibold text-xs rounded-lg transition-colors"
                 >
                   Done
                 </button>
@@ -898,20 +896,20 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
 
         {/* --- SUB-MODAL 3: ADMIN MANUAL INSTALLMENT MODAL (Rule 14) --- */}
         {showManualModal && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-slate-950/70 backdrop-blur-xs">
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-blue-950/55 backdrop-blur-xs">
             <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-              <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-bold text-white">
                     + Add Manual Installment
                   </h4>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-blue-100">
                     Administrator privilege only
                   </p>
                 </div>
                 <button
                   onClick={() => setShowManualModal(false)}
-                  className="p-1 text-slate-400 hover:text-white"
+                  className="p-1 text-blue-100 hover:text-white"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -940,7 +938,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                     min="1"
                     value={manualForm.amount}
                     onChange={(e) => setManualForm({ ...manualForm, amount: parseFloat(e.target.value) || 0 })}
-                    className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
 
@@ -955,7 +953,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                       placeholder="e.g. April 2026"
                       value={manualForm.month}
                       onChange={(e) => setManualForm({ ...manualForm, month: e.target.value })}
-                      className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                      className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                     />
                   </div>
                   <div>
@@ -967,7 +965,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                       required
                       value={manualForm.due_date}
                       onChange={(e) => setManualForm({ ...manualForm, due_date: e.target.value })}
-                      className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                      className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                     />
                   </div>
                 </div>
@@ -981,7 +979,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                     required
                     value={manualForm.notes}
                     onChange={(e) => setManualForm({ ...manualForm, notes: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                     placeholder="Reason for manual installment adjustment..."
                   />
                 </div>
@@ -996,7 +994,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 text-white font-semibold bg-red-700 hover:bg-red-800 rounded shadow-xs"
+                    className="px-4 py-1.5 text-white font-semibold bg-blue-700 hover:bg-blue-800 rounded shadow-xs"
                   >
                     Save Installment
                   </button>
@@ -1008,19 +1006,19 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
 
         {/* --- SUB-MODAL 5: ADMIN SETTLE LEFTOVER BALANCE --- */}
         {settlingInstallment && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-slate-950/70 backdrop-blur-xs">
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-blue-950/55 backdrop-blur-xs">
             <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-              <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-bold text-white">
                     Settle Balance ({settlingInstallment.name || `Installment ${settlingInstallment.installment_number}`})
                   </h4>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-blue-100">
                     Paid {formatCurrency(settlingInstallment.paid_amount)} of {formatCurrency(settlingInstallment.installment_amount)}
                     {' '}· Left {formatCurrency(getActualDue(settlingInstallment))}
                   </p>
                 </div>
-                <button onClick={() => setSettlingInstallment(null)} className="p-1 text-slate-400 hover:text-white">
+                <button onClick={() => setSettlingInstallment(null)} className="p-1 text-blue-100 hover:text-white">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -1035,12 +1033,12 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                     max={getActualDue(settlingInstallment)}
                     value={settleAmount}
                     onChange={(e) => setSettleAmount(parseFloat(e.target.value) || 0)}
-                    className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className={`flex items-start gap-2 rounded border px-3 py-2 cursor-pointer ${settleMode === 'next' ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}>
+                  <label className={`flex items-start gap-2 rounded border px-3 py-2 cursor-pointer ${settleMode === 'next' ? 'border-blue-400 bg-blue-50' : 'border-slate-200'}`}>
                     <input type="radio" checked={settleMode === 'next'} onChange={() => setSettleMode('next')} className="mt-0.5" />
                     <span>
                       <b>Add to next installment</b>
@@ -1049,7 +1047,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                       </span>
                     </span>
                   </label>
-                  <label className={`flex items-start gap-2 rounded border px-3 py-2 cursor-pointer ${settleMode === 'sub' ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}>
+                  <label className={`flex items-start gap-2 rounded border px-3 py-2 cursor-pointer ${settleMode === 'sub' ? 'border-blue-400 bg-blue-50' : 'border-slate-200'}`}>
                     <input type="radio" checked={settleMode === 'sub'} onChange={() => setSettleMode('sub')} className="mt-0.5" />
                     <span>
                       <b>Create sub-installment under this one</b>
@@ -1069,7 +1067,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                         required
                         value={settleMonth}
                         onChange={(e) => setSettleMonth(e.target.value)}
-                        className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                        className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                       />
                     </div>
                     <div>
@@ -1079,7 +1077,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                         required
                         value={settleDueDate}
                         onChange={(e) => setSettleDueDate(e.target.value)}
-                        className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                        className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                       />
                     </div>
                   </div>
@@ -1091,7 +1089,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                   <button type="button" onClick={() => setSettlingInstallment(null)} className="px-3 py-1.5 text-slate-600 bg-slate-100 rounded hover:bg-slate-200">
                     Cancel
                   </button>
-                  <button type="submit" className="px-4 py-1.5 text-white font-semibold bg-red-700 hover:bg-red-800 rounded shadow-xs">
+                  <button type="submit" className="px-4 py-1.5 text-white font-semibold bg-blue-700 hover:bg-blue-800 rounded shadow-xs">
                     Settle Balance
                   </button>
                 </div>
@@ -1102,20 +1100,20 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
 
         {/* --- SUB-MODAL 4: ADMIN EDIT INSTALLMENT (Rule 11 & 15) --- */}
         {editingInstallment && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-slate-950/70 backdrop-blur-xs">
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-blue-950/55 backdrop-blur-xs">
             <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-              <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-bold text-white">
                     Edit Installment ({editingInstallment.month})
                   </h4>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-blue-100">
                     Administrator privilege only
                   </p>
                 </div>
                 <button
                   onClick={() => setEditingInstallment(null)}
-                  className="p-1 text-slate-400 hover:text-white"
+                  className="p-1 text-blue-100 hover:text-white"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1137,7 +1135,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                       // keep "pay now" inside the remaining due
                       setEditPayNow(prev => Math.min(prev, Math.max(0, v - editingInstallment.paid_amount)));
                     }}
-                    className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600"
                   />
                   <span className="text-[10px] text-slate-500 mt-1 block">
                     Already paid: {formatCurrency(editingInstallment.paid_amount)}. Total fee changes only if you change this amount.
@@ -1155,7 +1153,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                     max={Math.max(0, editAmount - editingInstallment.paid_amount)}
                     value={editPayNow}
                     onChange={(e) => setEditPayNow(parseFloat(e.target.value) || 0)}
-                    className="w-full p-2 border border-amber-300 bg-amber-50/40 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-amber-300 bg-amber-50/40 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600"
                   />
                   <div className="mt-2 flex items-center justify-between rounded border border-red-200 bg-red-50 px-3 py-2">
                     <span className="font-semibold text-red-900">Due left in this installment</span>
@@ -1179,7 +1177,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                       required
                       value={editMonth}
                       onChange={(e) => setEditMonth(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                      className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                     />
                   </div>
                   <div>
@@ -1191,7 +1189,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                       required
                       value={editDueDate}
                       onChange={(e) => setEditDueDate(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                      className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                     />
                   </div>
                 </div>
@@ -1206,7 +1204,7 @@ export const StudentPaymentModal: React.FC<StudentPaymentModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 text-white font-semibold bg-red-700 hover:bg-red-800 rounded shadow-xs"
+                    className="px-4 py-1.5 text-white font-semibold bg-blue-700 hover:bg-blue-800 rounded shadow-xs"
                   >
                     Save Changes
                   </button>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { BookOpen, Plus, Edit, Check, X, Users, DollarSign, Clock } from 'lucide-react';
-import { Filter, Trash2 } from 'lucide-react';
+import { Plus, Edit, Check, X, Trash2 } from 'lucide-react';
+import { DataTable, Column, IconAction, PrimaryButton, StatusPill, filterSelectCls } from '../components/DataTable';
 import { Course } from '../types/crm';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
@@ -76,154 +76,81 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
     }
   };
 
+  const allStudents = db.getStudents();
+  const enrolled = (c: Course) => allStudents.filter(s => s.course_id === c.id).length;
+  const visible = courses.filter(c => departmentFilter === 'all' || c.department_id === departmentFilter);
+
+  const columns: Column<Course>[] = [
+    { key: 'course_code', header: 'Code', render: (c) => <span className="font-mono text-[11px] font-semibold text-slate-600">{c.course_code}</span> },
+    {
+      key: 'course_name', header: 'Course',
+      render: (c) => (
+        <div className="max-w-[300px]">
+          <div className="font-semibold text-slate-900">{c.course_name}</div>
+          {c.description && <div className="text-[10px] text-slate-400 truncate">{c.description}</div>}
+        </div>
+      )
+    },
+    { key: 'department_name', header: 'Department', render: (c) => c.department_name || <span className="text-slate-300">Unassigned</span> },
+    { key: 'duration', header: 'Duration' },
+    { key: 'enrolled', header: 'Students', align: 'center', sortValue: enrolled, render: (c) => <span className="tabular-nums font-semibold">{enrolled(c)}</span> },
+    { key: 'base_price', header: 'Course Fee', align: 'right', render: (c) => <span className="tabular-nums font-bold text-slate-900">{formatCurrency(c.base_price)}</span> },
+    { key: 'status', header: 'Status', render: (c) => <StatusPill status={c.status} /> }
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header Info */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">
-            Course Master & Tuition Pricing
-          </h2>
-        
-        </div>
-
-        {isAdmin && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg shadow-2xs transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add New Course
-          </button>
-        )}
-      </div>
-
-      {/* Department filter */}
-      <div className="flex items-center gap-2 text-xs">
-        <Filter className="w-3.5 h-3.5 text-slate-500" />
-        <select
-          value={departmentFilter}
-          onChange={(e) => setDepartmentFilter(e.target.value)}
-          className="p-1.5 bg-white border border-slate-200 rounded text-slate-700 text-xs font-semibold"
-        >
-          <option value="all">All Departments</option>
-          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
-      </div>
-
-      {/* Courses Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {courses.filter(c => departmentFilter === 'all' || c.department_id === departmentFilter).map((course) => {
-          const enrolledCount = db.getStudents().filter(s => s.course_id === course.id).length;
-          return (
-            <div 
-              key={course.id}
-              className="bg-white rounded-xl border border-slate-200 shadow-2xs p-5 flex flex-col justify-between hover:border-slate-300 transition-colors"
+      <DataTable<Course>
+        title={isAdmin ? 'Courses & Fees' : 'Courses'}
+        subtitle="Course list with duration and fee"
+        rows={visible}
+        columns={columns}
+        getRowId={(c) => c.id}
+        searchText={(c) => `${c.course_code} ${c.course_name} ${c.department_name || ''} ${c.description || ''}`}
+        searchPlaceholder="Search courses…"
+        exportFileName="courses"
+        initialSort={{ key: 'course_name', dir: 'asc' }}
+        actions={isAdmin ? <PrimaryButton onClick={() => setShowAddModal(true)} icon={<Plus className="w-4 h-4" />}>Add Course</PrimaryButton> : undefined}
+        toolbar={departments.length > 0 ? (
+          <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className={filterSelectCls} aria-label="Department">
+            <option value="all">All Departments</option>
+            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        ) : undefined}
+        rowActions={isAdmin ? (course) => (
+          <>
+            <IconAction title="Edit course" onClick={() => setEditingCourse({ ...course })}><Edit className="w-4 h-4" /></IconAction>
+            <IconAction
+              title="Delete course"
+              tone="danger"
+              onClick={async () => {
+                if (!window.confirm(`Delete course "${course.course_name}"?`)) return;
+                try { await db.deleteCourse(course.id); reloadData(); } catch (err: any) { alert(err.message); }
+              }}
             >
-              <div>
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div>
-                    <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 uppercase">
-                      {course.course_code}
-                    </span>
-                    <h3 className="text-base font-bold text-slate-900 mt-1">
-                      {course.course_name}
-                    </h3>
-                    <span className="text-[10px] font-semibold text-slate-500">
-                      Dept: {course.department_name || 'Unassigned'}
-                    </span>
-                  </div>
-
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                    course.status === 'active' 
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                      : 'bg-slate-100 text-slate-500 border-slate-200'
-                  }`}>
-                    {course.status}
-                  </span>
-                </div>
-
-                <p className="text-xs text-slate-600 line-clamp-2 mt-2">
-                  {course.description}
-                </p>
-
-                <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">
-                      Course Duration
-                    </span>
-                    <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      {course.duration}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-semibold">
-                      Enrolled Students
-                    </span>
-                    <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
-                      <Users className="w-3.5 h-3.5 text-slate-400" />
-                      {enrolledCount} active / alumni
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Price & Action footer */}
-              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-semibold block">
-                    Base Tuition Fee
-                  </span>
-                  <span className="text-xl font-black text-red-700 tabular-nums">
-                    {formatCurrency(course.base_price)}
-                  </span>
-                </div>
-
-                {isAdmin && (
-                  <div className="flex items-center gap-2">
-                  <button
-                    onClick={async () => {
-                      if (!window.confirm(`Delete course "${course.course_name}"?`)) return;
-                      try { await db.deleteCourse(course.id); reloadData(); } catch (err: any) { alert(err.message); }
-                    }}
-                    title="Delete course"
-                    className="p-1.5 text-red-600 hover:text-white hover:bg-red-600 border border-red-200 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setEditingCourse({ ...course })}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                    Edit Price / Details
-                  </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              <Trash2 className="w-4 h-4" />
+            </IconAction>
+          </>
+        ) : undefined}
+        emptyText="No courses yet."
+      />
 
       {/* --- EDIT COURSE MODAL --- */}
       {editingCourse && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-blue-950/50 backdrop-blur-xs">
           <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-white">
                   Edit Course Master
                 </h3>
-                <span className="text-xs text-slate-400 font-mono">
+                <span className="text-xs text-blue-100 font-mono">
                   {editingCourse.course_code}
                 </span>
               </div>
               <button
                 onClick={() => setEditingCourse(null)}
-                className="p-1 text-slate-400 hover:text-white"
+                className="p-1 text-blue-100 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -239,7 +166,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                   required
                   value={editingCourse.course_name}
                   onChange={(e) => setEditingCourse({ ...editingCourse, course_name: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -254,7 +181,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                   step="500"
                   value={editingCourse.base_price}
                   onChange={(e) => setEditingCourse({ ...editingCourse, base_price: parseFloat(e.target.value) || 0 })}
-                  className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-red-600 tabular-nums"
+                  className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600 tabular-nums"
                 />
                 <span className="text-[10px] text-slate-500 mt-1 block">
                   Future onboardings will divide this into 2 installments automatically.
@@ -269,7 +196,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                     required
                     value={editingCourse.duration}
                     onChange={(e) => setEditingCourse({ ...editingCourse, duration: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
                 <div>
@@ -277,7 +204,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                   <select
                     value={editingCourse.status}
                     onChange={(e) => setEditingCourse({ ...editingCourse, status: e.target.value as any })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -290,7 +217,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                 <select
                   value={editingCourse.department_id || ''}
                   onChange={(e) => setEditingCourse({ ...editingCourse, department_id: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 >
                   <option value="">— Unassigned —</option>
                   {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -303,7 +230,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                   rows={2}
                   value={editingCourse.description}
                   onChange={(e) => setEditingCourse({ ...editingCourse, description: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -317,7 +244,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-white font-semibold bg-red-700 hover:bg-red-800 rounded shadow-xs"
+                  className="px-4 py-1.5 text-white font-semibold bg-blue-700 hover:bg-blue-800 rounded shadow-xs"
                 >
                   Save Course
                 </button>
@@ -329,9 +256,9 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
 
       {/* --- ADD NEW COURSE MODAL --- */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-blue-950/50 backdrop-blur-xs">
           <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-white">
                   Add New Course Master
@@ -339,7 +266,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1 text-slate-400 hover:text-white"
+                className="p-1 text-blue-100 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -355,7 +282,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                     placeholder="e.g. TALLY-301"
                     value={newCourse.course_code}
                     onChange={(e) => setNewCourse({ ...newCourse, course_code: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
                 <div>
@@ -366,7 +293,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                     placeholder="3 Months"
                     value={newCourse.duration}
                     onChange={(e) => setNewCourse({ ...newCourse, duration: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
               </div>
@@ -379,7 +306,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                   placeholder="e.g. Advanced Tally Prime + GST"
                   value={newCourse.course_name}
                   onChange={(e) => setNewCourse({ ...newCourse, course_name: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -392,7 +319,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                   step="500"
                   value={newCourse.base_price}
                   onChange={(e) => setNewCourse({ ...newCourse, base_price: parseFloat(e.target.value) || 0 })}
-                  className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-red-600 tabular-nums"
+                  className="w-full p-2 border border-slate-300 rounded font-bold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600 tabular-nums"
                 />
               </div>
 
@@ -402,7 +329,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                   required
                   value={newCourse.department_id}
                   onChange={(e) => setNewCourse({ ...newCourse, department_id: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 >
                   <option value="">Select department…</option>
                   {departments.filter(d => d.status === 'active').map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -417,7 +344,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                   placeholder="Course curriculum and career placement coverage..."
                   value={newCourse.description}
                   onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -431,7 +358,7 @@ export const CoursesView: React.FC<CoursesViewProps> = ({ initialDepartmentId = 
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-white font-semibold bg-red-700 hover:bg-red-800 rounded shadow-xs"
+                  className="px-4 py-1.5 text-white font-semibold bg-blue-700 hover:bg-blue-800 rounded shadow-xs"
                 >
                   Create Course
                 </button>

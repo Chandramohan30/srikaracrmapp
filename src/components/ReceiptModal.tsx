@@ -74,17 +74,17 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ payment, onClose }) 
   const sendDisabled = linkState === 'loading';
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-slate-900/70 backdrop-blur-xs">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-3 bg-blue-950/55 backdrop-blur-xs">
       <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-300 overflow-hidden">
-        <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-red-700/80 rounded-lg"><FileText className="w-4 h-4" /></div>
+            <div className="p-1.5 bg-blue-500/80 rounded-lg"><FileText className="w-4 h-4" /></div>
             <div>
               <h4 className="text-sm font-bold leading-tight">Fee Receipt</h4>
-              <p className="text-[11px] font-mono text-slate-400">{payment.receipt_number}</p>
+              <p className="text-[11px] font-mono text-blue-100">{payment.receipt_number}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1 text-blue-100 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="p-5 space-y-4">
@@ -110,7 +110,7 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ payment, onClose }) 
           <button
             onClick={() => run('pdf')}
             disabled={busy === 'pdf'}
-            className="w-full py-2.5 bg-red-700 hover:bg-red-800 disabled:opacity-60 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors"
+            className="w-full py-2.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition-colors"
           >
             {busy === 'pdf' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             Download Receipt (PDF)

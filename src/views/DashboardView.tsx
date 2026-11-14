@@ -9,6 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import { formatCurrency, DueBadge } from '../components/StatusBadges';
 import { NavTab } from '../components/Sidebar';
 import { StudentPaymentModal } from '../components/StudentPaymentModal';
+import { StudentInstallmentsTable } from '../components/StudentInstallmentsTable';
+import { PeriodFilter, PeriodValue, defaultPeriod, periodRange, periodLabel as describePeriod } from '../components/PeriodFilter';
 
 interface DashboardViewProps {
   onNavigate: (tab: NavTab) => void;
@@ -24,26 +26,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [isStudentPaymentModalOpen, setIsStudentPaymentModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Dashboard filters: department (default = all), year (0 = all) and month (0 = whole year)
+  // Dashboard filters: department (default = all) + period (all time / month / year / custom date range)
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
-  const [yearFilter, setYearFilter] = useState<number>(0);
-  const [monthFilter, setMonthFilter] = useState<number>(0);
+  const [period, setPeriod] = useState<PeriodValue>(defaultPeriod());
 
   const departments = db.getDepartments();
   const availableYears = db.getAvailableYears();
-  const metrics = db.getDashboardMetrics({ department: departmentFilter, year: yearFilter, month: monthFilter });
-  const hasFilters = departmentFilter !== 'all' || yearFilter !== 0;
-  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const periodLabel = yearFilter
-    ? (monthFilter ? `${MONTHS[monthFilter - 1]} ${yearFilter}` : `Year ${yearFilter}`)
-    : 'All time';
+  const range = periodRange(period);
+  const hasPeriod = !!(range.from || range.to);
+  const metrics = db.getDashboardMetrics({ department: departmentFilter, ...range });
+  const hasFilters = departmentFilter !== 'all' || period.mode !== 'all';
+  const periodLabel = describePeriod(period);
   const departmentLabel = departmentFilter === 'all'
     ? 'All departments'
     : (db.getDepartmentById(departmentFilter)?.name || 'Department');
   const recentLogs = db.getAuditLogs().slice(0, 6);
   const students = db.getStudents(currentUser.role, currentUser.id);
-  const leaves = db.getLeaves(currentUser.role, currentUser.id);
-  const upcomingSchedules = db.getSchedules(currentUser.role, currentUser.id).slice(0, 4);
 
   // Student portal customized view
   if (isStudent) {
@@ -52,16 +50,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return (
       <div className="space-y-6">
         {/* Welcome Banner */}
-        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-red-950 rounded-xl p-6 text-white border border-slate-800 shadow-md">
+        <div className="bg-gradient-to-r from-blue-800 via-blue-700 to-blue-600 rounded-xl p-6 text-white border border-blue-800 shadow-md">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-widest">
+              <span className="text-xs font-bold text-amber-300 uppercase tracking-widest">
                 Student Learning Portal
               </span>
               <h2 className="text-xl font-bold mt-1">
                 Welcome back, {student?.full_name || currentUser.name}!
               </h2>
-              <p className="text-xs text-slate-300 mt-1">
+              <p className="text-xs text-blue-100 mt-1">
                 Enrolled in <strong className="text-white">{student?.course_name}</strong> · Faculty: <strong className="text-white">{student?.trainer_name}</strong>
               </p>
             </div>
@@ -71,7 +69,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   setSelectedStudentInstallmentId(undefined);
                   setIsStudentPaymentModalOpen(true);
                 }}
-                className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white font-semibold text-xs rounded-lg shadow-xs transition-colors"
+                className="px-4 py-2 bg-white hover:bg-blue-50 text-blue-800 font-semibold text-xs rounded-lg shadow-xs transition-colors"
               >
                 View Payment Schedule
               </button>
@@ -108,73 +106,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Installment Tracker Card */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Your Installments Plan</h3>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                <Lock className="w-3 h-3 text-slate-400" />
-                <span>Installment amounts are fixed for student payments (Admin editable only)</span>
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setSelectedStudentInstallmentId(undefined);
-                setIsStudentPaymentModalOpen(true);
-              }}
-              className="text-xs font-semibold text-red-700 hover:underline"
-            >
-              Pay Now &rarr;
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {installments.map((inst) => (
-              <div key={inst.id} className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-800">{inst.name || `Installment ${inst.installment_number}`}</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase ${
-                      inst.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                      inst.status === 'partially_paid' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                      'bg-slate-100 text-slate-700 border-slate-200'
-                    }`}>
-                      {inst.status}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">{inst.month}</div>
-                  <div className="mt-2 text-sm font-bold text-slate-900 tabular-nums">
-                    {formatCurrency(inst.installment_amount)}
-                  </div>
-                  <div className="mt-1 text-xs flex justify-between">
-                    <span className="text-slate-500">Due:</span>
-                    <span className={inst.due_amount > 0 ? 'font-bold text-red-600' : 'text-slate-500'}>
-                      {formatCurrency(inst.due_amount)}
-                    </span>
-                  </div>
-                </div>
-
-                {inst.due_amount > 0 ? (
-                  <button
-                    onClick={() => {
-                      setSelectedStudentInstallmentId(inst.id);
-                      setIsStudentPaymentModalOpen(true);
-                    }}
-                    className="mt-3 w-full py-1.5 px-2 bg-red-700 hover:bg-red-800 text-white font-bold text-xs rounded transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <CreditCard className="w-3.5 h-3.5" />
-                    <span>Pay Due ({formatCurrency(inst.due_amount)})</span>
-                  </button>
-                ) : (
-                  <div className="mt-3 text-center py-1 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded border border-emerald-100 flex items-center justify-center gap-1">
-                    <CheckCircle className="w-3 h-3" />
-                    <span>Cleared</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Installment plan (sub-installments shown under their installment) */}
+        <StudentInstallmentsTable
+          installments={installments}
+          onPay={(id) => { setSelectedStudentInstallmentId(id); setIsStudentPaymentModalOpen(true); }}
+        />
 
         {/* Student Payment Modal */}
         {student && isStudentPaymentModalOpen && (
@@ -192,36 +128,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           />
         )}
 
-        {/* Upcoming Classes */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs">
-          <h3 className="text-sm font-bold text-slate-900 mb-3">Upcoming Class Sessions</h3>
-          {upcomingSchedules.length === 0 ? (
-            <p className="text-xs text-slate-500">No scheduled classes at the moment.</p>
-          ) : (
-            <div className="space-y-2">
-              {upcomingSchedules.map((sch) => (
-                <div key={sch.id} className="flex flex-col sm:flex-row justify-between sm:items-center p-3 rounded-lg border border-slate-100 bg-slate-50 gap-2">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900">{sch.title}</h4>
-                    <p className="text-[11px] text-slate-500">{sch.topic} · Trainer: {sch.trainer_name}</p>
-                    <span className="text-[10px] text-red-700 font-semibold font-mono">
-                      {sch.class_date} ({sch.start_time} - {sch.end_time})
-                    </span>
-                  </div>
-                  <a
-                    href={sch.meeting_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold transition-colors self-start sm:self-center"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Join Google Meet
-                  </a>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     );
   }
@@ -230,11 +136,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Welcome / Action Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-red-950 rounded-xl p-5 sm:p-6 text-white border border-slate-800 shadow-sm">
+      <div className="bg-gradient-to-r from-blue-800 via-blue-700 to-blue-600 rounded-xl p-5 sm:p-6 text-white border border-blue-800 shadow-sm">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">
+              <span className="text-[11px] font-bold text-amber-300 uppercase tracking-widest">
                 Srikara Academy Operations
               </span>
               
@@ -249,14 +155,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={onOpenOnboardModal}
-                className="flex items-center gap-1.5 px-4 py-2 bg-red-700 hover:bg-red-800 text-white font-bold text-xs rounded-lg shadow-sm transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-blue-50 text-blue-800 font-bold text-xs rounded-lg shadow-sm transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                + Onboard New Student
+                Onboard New Student
               </button>
               <button
                 onClick={() => onNavigate('installments')}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-lg border border-slate-700 transition-colors"
+                className="px-3 py-2 bg-white/10 hover:bg-white/20 text-slate-200 font-semibold text-xs rounded-lg border border-white/25 transition-colors"
               >
                 View Dues Tracker
               </button>
@@ -265,8 +171,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Filters: Department + Month + Year */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs flex flex-wrap items-center gap-2 text-xs">
+      {/* Filters: Department + Period (month / year / custom date range) */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs flex flex-wrap items-center gap-2 text-xs">
         <div className="flex items-center gap-1 text-slate-500 font-semibold text-[11px] uppercase mr-1">
           <Filter className="w-3.5 h-3.5" />
           Filters
@@ -275,7 +181,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <select
           value={departmentFilter}
           onChange={(e) => setDepartmentFilter(e.target.value)}
-          className="p-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800 text-xs font-semibold"
+          className="h-9 px-2.5 bg-white border border-slate-300 rounded-lg text-slate-800 text-xs font-medium outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
           aria-label="Department"
         >
           <option value="all">All Departments</option>
@@ -284,54 +190,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           ))}
         </select>
 
-        <select
-          value={yearFilter}
-          onChange={(e) => {
-            const y = Number(e.target.value);
-            setYearFilter(y);
-            if (!y) setMonthFilter(0);
-          }}
-          className="p-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800 text-xs font-semibold"
-          aria-label="Year"
-        >
-          <option value={0}>All Years</option>
-          {availableYears.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+        <PeriodFilter value={period} onChange={setPeriod} years={availableYears} />
 
-        <select
-          value={monthFilter}
-          onChange={(e) => setMonthFilter(Number(e.target.value))}
-          disabled={!yearFilter}
-          className="p-1.5 bg-slate-50 border border-slate-200 rounded text-slate-800 text-xs font-semibold disabled:opacity-50"
-          aria-label="Month"
-          title={yearFilter ? '' : 'Pick a year to filter by month'}
-        >
-          <option value={0}>Whole Year</option>
-          {MONTHS.map((m, i) => (
-            <option key={m} value={i + 1}>{m}</option>
-          ))}
-        </select>
-
-        <span className="ml-auto text-[11px] text-slate-500">
-          Showing <strong className="text-slate-800">{departmentLabel}</strong> · <strong className="text-slate-800">{periodLabel}</strong>
-        </span>
+        
 
         {hasFilters && (
           <button
-            onClick={() => { setDepartmentFilter('all'); setYearFilter(0); setMonthFilter(0); }}
-            className="text-red-700 font-semibold hover:underline text-[11px]"
+            onClick={() => { setDepartmentFilter('all'); setPeriod(defaultPeriod()); }}
+            className="text-blue-700 font-semibold hover:underline text-[11px]"
           >
             Reset
           </button>
         )}
       </div>
 
-      {/* Section 3: 10 KPI Cards */}
+      {/* KPI Cards */}
       <div>
        
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-3">
           {/* 1. Total Students */}
           <div 
             onClick={() => onNavigate('students')}
@@ -344,7 +220,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-bold text-slate-900 tabular-nums">
               {metrics.totalStudents}
             </div>
-            <span className="text-[10px] text-slate-400 block mt-0.5">{yearFilter ? `Joined in ${periodLabel}` : 'Enrolled overall'}</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">{hasPeriod ? `Joined in ${periodLabel}` : 'Enrolled overall'}</span>
           </div>
 
           {/* 2. Active Students */}
@@ -404,7 +280,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-bold text-slate-900 tabular-nums">
               {formatCurrency(metrics.totalRevenue)}
             </div>
-            <span className="text-[10px] text-slate-400 block mt-0.5">{yearFilter ? 'Fees billed in period' : 'Total course bookings'}</span>
+            <span className="text-[10px] text-slate-400 block mt-0.5">{hasPeriod ? 'Fees billed in period' : 'Total course bookings'}</span>
           </div>
 
           {/* 6. Amount Collected */}
@@ -419,7 +295,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-bold text-emerald-700 tabular-nums">
               {formatCurrency(metrics.amountCollected)}
             </div>
-            <span className="text-[10px] text-emerald-600 block mt-0.5">{yearFilter ? 'Received in period' : 'Valid payments'}</span>
+            <span className="text-[10px] text-emerald-600 block mt-0.5">{hasPeriod ? 'Received in period' : 'Valid payments'}</span>
           </div>
 
           {/* 7. Total Outstanding */}
@@ -434,7 +310,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="text-xl font-bold text-red-700 tabular-nums">
               {formatCurrency(metrics.totalOutstanding)}
             </div>
-            <span className="text-[10px] text-red-600 block mt-0.5">{yearFilter ? 'Unpaid on period dues' : 'Remaining uncollected'}</span>
+            <span className="text-[10px] text-red-600 block mt-0.5">{hasPeriod ? 'Unpaid on period dues' : 'Remaining uncollected'}</span>
           </div>
 
           {/* 8. Partial Payments */}
@@ -467,20 +343,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-[10px] text-red-600 block mt-0.5 font-medium">Pending collection</span>
           </div>
 
-          {/* 10. Pending Leave Requests */}
-          <div 
-            onClick={() => onNavigate('leaves')}
-            className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs hover:border-slate-300 cursor-pointer transition-all"
-          >
-            <div className="flex items-center justify-between text-slate-500 mb-1">
-              <span className="text-[11px] font-semibold uppercase">Pending Leaves</span>
-              <Calendar className="w-4 h-4 text-amber-600" />
-            </div>
-            <div className="text-xl font-bold text-amber-700 tabular-nums">
-              {metrics.pendingLeaveRequests}
-            </div>
-            <span className="text-[10px] text-slate-400 block mt-0.5">Awaiting approval</span>
-          </div>
         </div>
       </div>
 
@@ -497,7 +359,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <button
               onClick={() => onNavigate('payments')}
-              className="text-xs font-semibold text-red-700 hover:underline flex items-center gap-1"
+              className="text-xs font-semibold text-blue-700 hover:underline flex items-center gap-1"
             >
               Ledger <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
@@ -509,17 +371,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="flex justify-between text-xs mb-1">
                 <span className="font-semibold text-slate-700">Collection Rate</span>
                 <span className="font-bold text-emerald-700">
-                  {Math.round((metrics.amountCollected / (metrics.totalRevenue || 1)) * 100)}% Collected
+                  {metrics.totalRevenue > 0
+                    ? `${Math.min(100, Math.round((metrics.amountCollected / metrics.totalRevenue) * 100))}% Collected`
+                    : 'Nothing billed in this period'}
                 </span>
               </div>
               <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
                 <div 
                   className="bg-emerald-600 h-full transition-all" 
-                  style={{ width: `${(metrics.amountCollected / (metrics.totalRevenue || 1)) * 100}%` }} 
+                  style={{ width: `${metrics.totalRevenue > 0 ? Math.min(100, (metrics.amountCollected / metrics.totalRevenue) * 100) : 0}%` }} 
                 />
                 <div 
                   className="bg-red-500 h-full transition-all" 
-                  style={{ width: `${(metrics.totalOutstanding / (metrics.totalRevenue || 1)) * 100}%` }} 
+                  style={{ width: `${metrics.totalRevenue > 0 ? Math.min(100, (metrics.totalOutstanding / metrics.totalRevenue) * 100) : 0}%` }} 
                 />
               </div>
               <div className="flex justify-between text-[11px] text-slate-400 mt-1">
@@ -550,7 +414,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <div key={m.month} className="flex flex-col items-center">
                       <div className="h-28 w-full bg-slate-50 rounded-lg flex items-end justify-center p-1">
                         <div 
-                          className="w-full bg-red-700 rounded transition-all hover:bg-red-800"
+                          className="w-full bg-blue-700 rounded transition-all hover:bg-blue-800"
                           style={{ height: `${m.amount > 0 ? Math.max(8, barHeight) : 2}%` }}
                           title={`${m.month}: ${formatCurrency(m.amount)}`}
                         />
@@ -581,7 +445,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <p className="text-xs text-slate-500">No courses in this department yet.</p>
             )}
             {metrics.courseBreakdown.map((c, idx) => {
-              const colors = ['bg-red-700', 'bg-amber-600', 'bg-blue-600', 'bg-emerald-600', 'bg-purple-600', 'bg-slate-600'];
+              const colors = ['bg-blue-700', 'bg-amber-600', 'bg-sky-500', 'bg-emerald-600', 'bg-purple-600', 'bg-slate-600'];
               return (
                 <div key={c.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                   <div className="flex justify-between items-center text-xs gap-2">
@@ -629,17 +493,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Department-wise summary (follows the Month / Year filter) */}
+      {/* Department-wise summary (follows the period filter) */}
       {isAdmin && departmentFilter === 'all' && departments.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs">
           <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
             <div>
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-red-700" /> Department-wise Summary
+                <Building2 className="w-4 h-4 text-blue-700" /> Department-wise Summary
               </h3>
               <p className="text-[11px] text-slate-500">{periodLabel} · click a row to focus the dashboard on it</p>
             </div>
-            <button onClick={() => onNavigate('departments')} className="text-xs font-semibold text-red-700 hover:underline">
+            <button onClick={() => onNavigate('departments')} className="text-xs font-semibold text-blue-700 hover:underline">
               Departments &rarr;
             </button>
           </div>
@@ -656,7 +520,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {departments.map((d) => {
-                  const m = db.getDashboardMetrics({ department: d.id, year: yearFilter, month: monthFilter });
+                  const m = db.getDashboardMetrics({ department: d.id, ...range });
                   return (
                     <tr key={d.id} onClick={() => setDepartmentFilter(d.id)} className="hover:bg-slate-50 cursor-pointer">
                       <td className="py-2 pr-3 font-semibold text-slate-800">{d.name}</td>
@@ -678,7 +542,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
           <div>
             <h3 className="text-sm font-bold text-slate-900">Recent Academy Activity & Audit Trail</h3>
-            <p className="text-[11px] text-slate-500">Live transaction, leave, and admission events</p>
+            <p className="text-[11px] text-slate-500">Live transaction and admission events</p>
           </div>
           <button
             onClick={() => onNavigate('settings')}

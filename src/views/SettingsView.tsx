@@ -50,7 +50,7 @@ export const SettingsView: React.FC = () => {
                 disabled={!isAdmin}
                 value={settings.academyName}
                 onChange={(e) => setSettings({ ...settings, academyName: e.target.value })}
-                className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600 disabled:bg-slate-100"
+                className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600 disabled:bg-slate-100"
               />
             </div>
             <div>
@@ -60,7 +60,7 @@ export const SettingsView: React.FC = () => {
                 disabled={!isAdmin}
                 value={settings.website}
                 onChange={(e) => setSettings({ ...settings, website: e.target.value })}
-                className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600 disabled:bg-slate-100"
+                className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600 disabled:bg-slate-100"
               />
             </div>
             <div>
@@ -70,7 +70,7 @@ export const SettingsView: React.FC = () => {
                 disabled={!isAdmin}
                 value={settings.academyEmail}
                 onChange={(e) => setSettings({ ...settings, academyEmail: e.target.value })}
-                className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600 disabled:bg-slate-100"
+                className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600 disabled:bg-slate-100"
               />
             </div>
             <div>
@@ -80,7 +80,7 @@ export const SettingsView: React.FC = () => {
                 disabled={!isAdmin}
                 value={settings.academyPhone}
                 onChange={(e) => setSettings({ ...settings, academyPhone: e.target.value })}
-                className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600 disabled:bg-slate-100"
+                className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600 disabled:bg-slate-100"
               />
             </div>
             <div className="sm:col-span-2">
@@ -90,7 +90,7 @@ export const SettingsView: React.FC = () => {
                 disabled={!isAdmin}
                 value={settings.address}
                 onChange={(e) => setSettings({ ...settings, address: e.target.value })}
-                className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600 disabled:bg-slate-100"
+                className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600 disabled:bg-slate-100"
               />
             </div>
           </div>
@@ -104,7 +104,7 @@ export const SettingsView: React.FC = () => {
               ) : <div />}
               <button
                 type="submit"
-                className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white font-semibold rounded-lg shadow-xs transition-colors"
+                className="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-lg shadow-xs transition-colors"
               >
                 Save Academy Profile
               </button>
@@ -118,7 +118,7 @@ export const SettingsView: React.FC = () => {
         <div className="border-b pb-3 flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-red-700" />
+              <CreditCard className="w-5 h-5 text-blue-700" />
               Fee Collection (UPI)
             </h3>
           </div>
@@ -190,14 +190,6 @@ export const SettingsView: React.FC = () => {
               <div className="p-2 bg-white rounded border border-slate-200">
                 <span className="font-mono font-bold text-slate-800">courses</span>
                 <span className="text-slate-400 block text-[10px]">Curriculum & Prices</span>
-              </div>
-              <div className="p-2 bg-white rounded border border-slate-200">
-                <span className="font-mono font-bold text-slate-800">leaves</span>
-                <span className="text-slate-400 block text-[10px]">Student Absence</span>
-              </div>
-              <div className="p-2 bg-white rounded border border-slate-200">
-                <span className="font-mono font-bold text-slate-800">schedules</span>
-                <span className="text-slate-400 block text-[10px]">Classes & Meets</span>
               </div>
             </div>
           </div>

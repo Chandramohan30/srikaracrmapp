@@ -1,231 +1,160 @@
 import React, { useState } from 'react';
-import { 
-  Shield, Mail, Lock, ArrowRight, AlertCircle, 
-  GraduationCap, Users, Key
-} from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { SrikaraLogo } from './SrikaraLogo';
+import { CrmIllustration } from './CrmIllustration';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types/crm';
 
-// Only the Admin has a sample login. Students & trainers sign in with the
-// email used at onboarding and their Student ID / Trainer ID as the password.
-const defaultCredentials: Record<UserRole, { email: string; password: string; name: string; desc: string }> = {
-  student: {
-    email: '',
-    password: '',
-    name: 'Use your Student ID as password',
-    desc: 'View course, timetable & pay installments'
-  },
-  trainer: {
-    email: '',
-    password: '',
-    name: 'Use your Trainer ID as password',
-    desc: 'Manage schedules & view assigned students'
-  },
-  admin: {
-    email: '',
-    password: '',
-    name: 'Academy Admin',
-    desc: 'Full academy control, fee master & settings'
-  }
-};
-
 interface LoginPageProps {
+  /** Called with the role the server returned, so the app can redirect to the right home page */
   onLoginSuccess?: (role: UserRole) => void;
 }
 
+// Email + password only. The role (admin / trainer / student) is read from the account
+// on the server, so there is no role picker. Students & trainers use their Student ID /
+// Trainer ID as the password.
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const { login } = useAuth();
-  
-  const [selectedRole, setSelectedRole] = useState<UserRole>('student');
-  const [emailInput, setEmailInput] = useState<string>(defaultCredentials.student.email);
-  const [passwordInput, setPasswordInput] = useState<string>(defaultCredentials.student.password);
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleRoleChange = (role: UserRole) => {
-    setSelectedRole(role);
-    setEmailInput(defaultCredentials[role].email);
-    setPasswordInput(defaultCredentials[role].password);
-    setErrorMsg(null);
-  };
-
-  const handleQuickSelect = (role: UserRole) => {
-    setSelectedRole(role);
-    setEmailInput(defaultCredentials[role].email);
-    setPasswordInput(defaultCredentials[role].password);
-    setErrorMsg(null);
-  };
-
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!emailInput.trim()) {
-      setErrorMsg('Please enter your email address.');
-      return;
-    }
+    if (!email.trim()) return setErrorMsg('Please enter your email address.');
+    if (!password) return setErrorMsg('Please enter your password.');
 
     setIsSubmitting(true);
-    const result = await login(selectedRole, emailInput.trim(), passwordInput);
+    const result = await login(email.trim(), password);
     setIsSubmitting(false);
-    if (result.success) {
-      if (onLoginSuccess) {
-        onLoginSuccess(selectedRole);
-      }
+
+    if (result.success && result.user) {
+      onLoginSuccess?.(result.user.role);
     } else {
-      setErrorMsg(result.error || 'Invalid credentials. Please verify your role and email.');
+      setErrorMsg(result.error || 'Invalid email or password.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 sm:p-6 text-slate-100">
-      {/* Background Subtle Gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(185,28,28,0.22),rgba(15,23,42,0.95))] pointer-events-none" />
+    <div className="min-h-screen bg-white grid grid-cols-1 lg:grid-cols-[1.15fr_1fr]">
+      {/* LEFT: illustration panel */}
+      <div className="relative hidden lg:flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 px-12 py-10">
+        <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-white/10" />
+        <div className="absolute -bottom-32 -right-20 w-96 h-96 rounded-full bg-white/10" />
+        <div className="absolute top-1/3 right-10 w-24 h-24 rounded-full border-2 border-white/15" />
 
-      <div className="relative w-full max-w-md my-auto space-y-5 z-10">
-        {/* Srikara Academy Brand Header with Shield Logo */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur-md text-center">
-          <SrikaraLogo variant="full" size="lg" theme="dark" />
+        <CrmIllustration className="relative w-full max-w-xl drop-shadow-2xl" />
+
+        <div className="relative mt-8 text-center text-white max-w-md">
+          <h1 className="text-2xl font-bold tracking-tight">Admissions, classes &amp; fees — in one place</h1>
+          <p className="mt-2 text-sm text-blue-100 leading-relaxed">
+            Srikara CRM helps the academy track every student from enquiry to placement.
+          </p>
         </div>
+      </div>
 
-        {/* Clean Login Form Card */}
-        <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl">
-          <div className="mb-5 text-center">
-            <h2 className="text-base font-bold text-white tracking-wide">
-              Sign Ins
-            </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              Select your role and enter credentials to continue
+      {/* RIGHT: sign-in form */}
+      <div className="flex flex-col min-h-screen">
+        <div className="flex-1 flex items-center justify-center px-6 py-10 sm:px-12">
+          <div className="w-full max-w-sm">
+            <div className="flex justify-center mb-6">
+              <SrikaraLogo variant="horizontal" size="lg" />
+            </div>
+
+            <div className="text-center mb-7">
+              <h2 className="text-xl font-bold text-slate-900">Welcome back</h2>
+              <p className="text-xs text-slate-500 mt-1.5">
+                Please sign in with your email and password to continue.
+              </p>
+            </div>
+
+            {errorMsg && (
+              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              <div>
+                <label htmlFor="login-email" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    id="login-email"
+                    type="email"
+                    autoComplete="username"
+                    autoFocus
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@srikaraacademy.com"
+                    className="w-full pl-10 pr-3 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="login-password" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-10 py-2.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-blue-700"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1.5">
+                  Students &amp; trainers: use your Student ID / Trainer ID as the password.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full mt-2 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-wait text-white text-sm font-bold shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 transition-colors"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Signing in…
+                  </>
+                ) : (
+                  <>
+                    Sign In <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="text-[11px] text-slate-400 text-center mt-6">
+              Forgot your password? Contact the academy admin.
             </p>
           </div>
-
-          {errorMsg && (
-            <div className="mb-4 p-3 rounded-lg bg-red-950/80 border border-red-800 text-xs text-red-200 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
-            {/* 1. Choose Role in Form */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-slate-300 font-semibold">
-                  Choose Role *
-                </label>
-                <span className="text-[10px] text-slate-400">
-                  {defaultCredentials[selectedRole].name}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {/* 1 Student */}
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange('student')}
-                  className={`p-2.5 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all ${
-                    selectedRole === 'student'
-                      ? 'bg-emerald-950 border-emerald-500 text-white shadow-sm ring-1 ring-emerald-500 font-bold'
-                      : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-                  }`}
-                >
-                  <Users className={`w-4 h-4 ${selectedRole === 'student' ? 'text-emerald-400' : 'text-slate-500'}`} />
-                  <span className="text-[11px]">Student</span>
-                </button>
-
-                {/* 1 Trainer */}
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange('trainer')}
-                  className={`p-2.5 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all ${
-                    selectedRole === 'trainer'
-                      ? 'bg-amber-950 border-amber-500 text-white shadow-sm ring-1 ring-amber-500 font-bold'
-                      : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-                  }`}
-                >
-                  <GraduationCap className={`w-4 h-4 ${selectedRole === 'trainer' ? 'text-amber-400' : 'text-slate-500'}`} />
-                  <span className="text-[11px]">Trainer</span>
-                </button>
-
-                {/* 1 Admin */}
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange('admin')}
-                  className={`p-2.5 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all ${
-                    selectedRole === 'admin'
-                      ? 'bg-red-950 border-red-500 text-white shadow-sm ring-1 ring-red-500 font-bold'
-                      : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
-                  }`}
-                >
-                  <Shield className={`w-4 h-4 ${selectedRole === 'admin' ? 'text-red-400' : 'text-slate-500'}`} />
-                  <span className="text-[11px]">Admin</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 2. Email Address */}
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">
-                Email Address *
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-                <input
-                  type="email"
-                  required
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="name@srikaraacademy.com"
-                  className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-slate-100 placeholder-slate-600 outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* 3. Password */}
-            <div>
-              <label className="block text-slate-300 font-semibold mb-1">
-                Password *
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-                <input
-                  type="password"
-                  required
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder={selectedRole === 'admin' ? '••••••••' : selectedRole === 'student' ? 'Your Student ID (e.g. SRK-2026-001)' : 'Your Trainer ID (e.g. TRN-001)'}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-slate-100 placeholder-slate-600 outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-colors"
-                />
-              </div>
-            </div>
-
-            {/* 4. Submit & Role Redirection Button */}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`w-full py-2.5 disabled:opacity-70 disabled:cursor-wait text-white font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2 mt-4 ${
-                selectedRole === 'admin'
-                  ? 'bg-red-700 hover:bg-red-800'
-                  : selectedRole === 'trainer'
-                  ? 'bg-amber-700 hover:bg-amber-800'
-                  : 'bg-emerald-700 hover:bg-emerald-800'
-              }`}
-            >
-              <span>
-              Sign In 
-              </span>
-             
-            </button>
-          </form>
-
-         
         </div>
 
-        {/* Footer info */}
-        <div className="text-center text-[11px] text-slate-500 space-y-1">
-          <div>Srikara Training & Placement Academy · ISO Certified</div>
-          <div className="text-slate-600">www.srikaraacademy.com</div>
-        </div>
+        <footer className="px-6 py-4 text-center text-[11px] text-slate-400 border-t border-slate-100">
+          © {new Date().getFullYear()} Srikara Training &amp; Placement Academy, Coimbatore. All rights reserved.
+        </footer>
       </div>
     </div>
   );

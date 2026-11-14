@@ -5,8 +5,17 @@
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
   
-  .font-mono, .tabular-nums {
+  .font-mono {
     font-family: 'JetBrains Mono', monospace;
+  }
+  /* aligned digits for amounts, in the normal UI font */
+  .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
+}
+
+/* Indeterminate slide used by the startup loader */
+@keyframes srk-slide {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(320%); }
 }

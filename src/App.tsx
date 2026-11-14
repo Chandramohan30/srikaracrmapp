@@ -9,26 +9,32 @@ import { CoursesView } from './views/CoursesView';
 import { TrainersView } from './views/TrainersView';
 import { PaymentsView } from './views/PaymentsView';
 import { InstallmentsView } from './views/InstallmentsView';
-import { LeaveManagementView } from './views/LeaveManagementView';
-import { ClassScheduleView } from './views/ClassScheduleView';
-import { GoogleCalendarView } from './views/GoogleCalendarView';
-import { ReportsView } from './views/ReportsView';
 import { SettingsView } from './views/SettingsView';
 import { StudentProfileView } from './views/StudentProfileView';
 import { StudentOnboardingModal } from './components/StudentOnboardingModal';
 import { LoginPage } from './components/LoginPage';
 import { db } from './services/db';
 import { ChatBot } from './components/ChatBot';
+import { TopLoadingBar } from './components/TopLoadingBar';
+import { SrikaraLogo } from './components/SrikaraLogo';
+import { UserRole } from './types/crm';
+
+// Landing page for each role after sign-in / session restore
+const homeTabFor = (role: UserRole): NavTab => (role === 'student' ? 'profile' : 'dashboard');
 
 const AppContent: React.FC = () => {
   const { currentUser, isAdmin, isTrainer, isStudent, isAuthenticated, isLoading } = useAuth();
   const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
-  const [scheduleStudentFilter, setScheduleStudentFilter] = useState<string | undefined>(undefined);
   const [refreshKey, setRefreshKey] = useState(0);
   // department chosen via a Departments-page link; Students / Courses / Trainers pages start filtered to it
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+
+  // Redirect to the role's home page whenever a (different) user signs in or a session is restored
+  React.useEffect(() => {
+    if (isAuthenticated) setCurrentTab(homeTabFor(currentUser.role));
+  }, [isAuthenticated, currentUser.id]);
 
   const refreshData = async () => {
     try {
@@ -42,8 +48,12 @@ const AppContent: React.FC = () => {
   // Restoring a saved session from the API
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 text-xs">
-        Loading Srikara CRM...
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-100 flex flex-col items-center justify-center gap-5">
+        <SrikaraLogo variant="horizontal" size="md" theme="light" />
+        <div className="w-48 h-1.5 rounded-full bg-blue-100 overflow-hidden">
+          <div className="h-full w-1/3 rounded-full bg-blue-600 animate-[srk-slide_1.1s_ease-in-out_infinite]" />
+        </div>
+        <span className="text-xs font-medium text-blue-900/60">Loading Srikara CRM…</span>
       </div>
     );
   }
@@ -51,47 +61,29 @@ const AppContent: React.FC = () => {
   // If not authenticated, show default Login Page as requested
   if (!isAuthenticated) {
     return (
-      <LoginPage 
-        onLoginSuccess={(role) => {
-          if (role === 'student') {
-            setCurrentTab('profile');
-          } else if (role === 'trainer') {
-            setCurrentTab('dashboard');
-          } else {
-            setCurrentTab('dashboard');
-          }
-        }} 
-      />
+      <LoginPage onLoginSuccess={(role) => setCurrentTab(homeTabFor(role))} />
     );
   }
 
   // Compute live badge counts
-  const pendingLeavesCount = db.getLeaves().filter(l => l.status === 'pending').length;
   const duesCount = db.getInstallments().filter(i => i.due_amount > 0).length;
 
   const handleRefresh = () => {
     refreshData();
   };
 
-  const handleNavigateToSchedule = (studentId: string) => {
-    setScheduleStudentFilter(studentId);
-    setCurrentTab('schedules');
-  };
-
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
+    <div className="flex h-screen bg-blue-50/40 text-slate-900 font-sans overflow-hidden">
       {/* Main Sidebar (Section 2) */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={(tab) => {
           setCurrentTab(tab);
-          setScheduleStudentFilter(undefined);
           setDepartmentFilter('all');
           refreshData(); // pull the latest data from MongoDB
         }}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        pendingLeavesCount={pendingLeavesCount}
         duesCount={duesCount}
       />
 
@@ -128,7 +120,6 @@ const AppContent: React.FC = () => {
               <StudentsView
                 initialDepartmentId={departmentFilter}
                 onOpenOnboardModal={() => setIsOnboardModalOpen(true)}
-                onNavigateToSchedule={handleNavigateToSchedule}
               />
             )}
 
@@ -139,16 +130,6 @@ const AppContent: React.FC = () => {
             {currentTab === 'payments' && <PaymentsView />}
 
             {currentTab === 'installments' && <InstallmentsView />}
-
-            {currentTab === 'leaves' && <LeaveManagementView />}
-
-            {currentTab === 'schedules' && (
-              <ClassScheduleView initialStudentId={scheduleStudentFilter} />
-            )}
-
-            {currentTab === 'calendar' && <GoogleCalendarView />}
-
-            {currentTab === 'reports' && <ReportsView />}
 
             {currentTab === 'settings' && <SettingsView />}
 
@@ -179,6 +160,7 @@ const AppContent: React.FC = () => {
 export function App() {
   return (
     <AuthProvider>
+      <TopLoadingBar />
       <AppContent />
     </AuthProvider>
   );

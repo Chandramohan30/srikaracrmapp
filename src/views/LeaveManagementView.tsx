@@ -102,7 +102,7 @@ export const LeaveManagementView: React.FC = () => {
         {isStudent && (
           <button
             onClick={() => setShowApplyModal(true)}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg shadow-2xs transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-2xs transition-colors"
           >
             <Plus className="w-4 h-4" />
             + Apply for Leave
@@ -219,13 +219,13 @@ export const LeaveManagementView: React.FC = () => {
 
       {/* --- STUDENT APPLY LEAVE MODAL --- */}
       {showApplyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-blue-950/50 backdrop-blur-xs">
           <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
               <h3 className="text-base font-bold text-white">
                 Apply for Leave
               </h3>
-              <button onClick={() => setShowApplyModal(false)} className="p-1 text-slate-400 hover:text-white">
+              <button onClick={() => setShowApplyModal(false)} className="p-1 text-blue-100 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -246,7 +246,7 @@ export const LeaveManagementView: React.FC = () => {
                     required
                     value={applyForm.from_date}
                     onChange={(e) => setApplyForm({ ...applyForm, from_date: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
                 <div>
@@ -256,7 +256,7 @@ export const LeaveManagementView: React.FC = () => {
                     required
                     value={applyForm.to_date}
                     onChange={(e) => setApplyForm({ ...applyForm, to_date: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
               </div>
@@ -269,7 +269,7 @@ export const LeaveManagementView: React.FC = () => {
                   placeholder="Explain reason for absence..."
                   value={applyForm.reason}
                   onChange={(e) => setApplyForm({ ...applyForm, reason: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -283,7 +283,7 @@ export const LeaveManagementView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-white font-semibold bg-red-700 hover:bg-red-800 rounded shadow-xs"
+                  className="px-4 py-1.5 text-white font-semibold bg-blue-700 hover:bg-blue-800 rounded shadow-xs"
                 >
                   Submit Application
                 </button>
@@ -295,7 +295,7 @@ export const LeaveManagementView: React.FC = () => {
 
       {/* --- ADMIN APPROVE/REJECT REMARKS MODAL --- */}
       {remarksModalLeave && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-blue-950/50 backdrop-blur-xs">
           <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
             <div className={`px-5 py-4 text-white flex items-center justify-between ${
               adminAction === 'approve' ? 'bg-emerald-700' : 'bg-red-700'
@@ -328,7 +328,7 @@ export const LeaveManagementView: React.FC = () => {
                   required
                   value={adminRemarks}
                   onChange={(e) => setAdminRemarks(e.target.value)}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 

@@ -119,7 +119,7 @@ export const GoogleCalendarView: React.FC = () => {
                     href={gcalUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg shadow-2xs transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-2xs transition-colors"
                   >
                     <Calendar className="w-3.5 h-3.5" />
                     Open in Google Calendar

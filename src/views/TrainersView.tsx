@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { GraduationCap, Users, Plus, Mail, Phone, Calendar, Clock, Edit, X, Check, BookOpen } from 'lucide-react';
-import { Filter, Trash2 } from 'lucide-react';
+import { Plus, Edit, X, Check, Trash2 } from 'lucide-react';
+import { DataTable, Column, IconAction, PrimaryButton, StatusPill, filterSelectCls } from '../components/DataTable';
+
+const fieldCls = 'w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600 focus:border-blue-600';
 import { Trainer, Student } from '../types/crm';
 import { db } from '../services/db';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +17,8 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedTrainerDetails, setSelectedTrainerDetails] = useState<Trainer | null>(null);
   const [showAddTrainerModal, setShowAddTrainerModal] = useState(false);
+  const [editingTrainer, setEditingTrainer] = useState<Trainer | null>(null);
+  const [editSkills, setEditSkills] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState(initialDepartmentId);
   const departments = db.getDepartments();
 
@@ -81,178 +85,184 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
     }
   };
 
+  const assigned = (t: Trainer) => students.filter(s => s.trainer_id === t.id).length;
+  const visible = trainers.filter(t => departmentFilter === 'all' || t.department_id === departmentFilter);
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTrainer) return;
+    try {
+      await db.updateTrainer(editingTrainer.id, {
+        name: editingTrainer.name,
+        email: editingTrainer.email,
+        phone: editingTrainer.phone,
+        specialization: editingTrainer.specialization,
+        experience: editingTrainer.experience,
+        department_id: editingTrainer.department_id || '',
+        status: editingTrainer.status,
+        skills: editSkills.split(',').map(x => x.trim()).filter(Boolean)
+      }, currentUser);
+      setEditingTrainer(null);
+      reloadData();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const columns: Column<Trainer>[] = [
+    {
+      key: 'name', header: 'Trainer',
+      render: (t) => (
+        <div>
+          <div className="font-semibold text-slate-900">{t.name}</div>
+          <div className="text-[10px] text-slate-400 font-mono">{t.trainer_code}</div>
+        </div>
+      ),
+      exportValue: (t) => `${t.name} (${t.trainer_code})`
+    },
+    {
+      key: 'email', header: 'Contact',
+      render: (t) => (
+        <div>
+          <div className="text-slate-800">{t.phone}</div>
+          <div className="text-[10px] text-slate-400">{t.email}</div>
+        </div>
+      )
+    },
+    { key: 'department_name', header: 'Department', render: (t) => t.department_name || <span className="text-slate-300">Unassigned</span> },
+    { key: 'specialization', header: 'Specialization', render: (t) => <span className="text-slate-800">{t.specialization}</span> },
+    { key: 'experience', header: 'Experience' },
+    { key: 'joining_date', header: 'Joined', render: (t) => <span className="tabular-nums text-slate-500">{t.joining_date}</span> },
+    {
+      key: 'assigned', header: 'Students', align: 'center', sortValue: assigned,
+      render: (t) => <span className="inline-flex min-w-8 h-7 px-2 items-center justify-center rounded-md bg-blue-50 text-blue-700 font-semibold tabular-nums">{assigned(t)}</span>
+    },
+    { key: 'status', header: 'Status', render: (t) => <StatusPill status={t.status} /> }
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header Info */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">
-            Trainer Master & Faculty Directory
-          </h2>
-         
-        </div>
-
-        {isAdmin && (
-          <button
-            onClick={() => setShowAddTrainerModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg shadow-2xs transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Onboard New Trainer
-          </button>
-        )}
-      </div>
-
-      {/* Department filter */}
-      <div className="flex items-center gap-2 text-xs">
-        <Filter className="w-3.5 h-3.5 text-slate-500" />
-        <select
-          value={departmentFilter}
-          onChange={(e) => setDepartmentFilter(e.target.value)}
-          className="p-1.5 bg-white border border-slate-200 rounded text-slate-700 text-xs font-semibold"
-        >
-          <option value="all">All Departments</option>
-          {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
-      </div>
-
-      {/* Trainers Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {trainers.filter(t => departmentFilter === 'all' || t.department_id === departmentFilter).map((trainer) => {
-          const assignedStudents = students.filter(s => s.trainer_id === trainer.id);
-          return (
-            <div 
-              key={trainer.id}
-              className="bg-white rounded-xl border border-slate-200 shadow-2xs p-5 flex flex-col justify-between hover:border-slate-300 transition-colors"
+      <DataTable<Trainer>
+        title="Trainers"
+        subtitle="Click a trainer to see the students assigned to them"
+        rows={visible}
+        columns={columns}
+        getRowId={(t) => t.id}
+        searchText={(t) => `${t.name} ${t.trainer_code} ${t.email} ${t.phone} ${t.specialization} ${t.skills.join(' ')}`}
+        searchPlaceholder="Search trainers…"
+        exportFileName="trainers"
+        initialSort={{ key: 'name', dir: 'asc' }}
+        onRowClick={(t) => setSelectedTrainerDetails(t)}
+        actions={isAdmin ? <PrimaryButton onClick={() => setShowAddTrainerModal(true)} icon={<Plus className="w-4 h-4" />}>Add Trainer</PrimaryButton> : undefined}
+        toolbar={departments.length > 0 ? (
+          <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className={filterSelectCls} aria-label="Department">
+            <option value="all">All Departments</option>
+            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        ) : undefined}
+        rowActions={isAdmin ? (trainer) => (
+          <>
+            <IconAction title="Edit trainer" onClick={() => { setEditingTrainer({ ...trainer }); setEditSkills(trainer.skills.join(', ')); }}>
+              <Edit className="w-4 h-4" />
+            </IconAction>
+            <IconAction
+              title="Delete trainer"
+              tone="danger"
+              onClick={async () => {
+                if (!window.confirm(`Delete trainer ${trainer.name} (${trainer.trainer_code})? Their login will be removed.`)) return;
+                try { await db.deleteTrainer(trainer.id); reloadData(); } catch (err: any) { alert(err.message); }
+              }}
             >
+              <Trash2 className="w-4 h-4" />
+            </IconAction>
+          </>
+        ) : undefined}
+        emptyText="No trainers yet."
+      />
+
+      {/* --- EDIT TRAINER MODAL --- */}
+      {editingTrainer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-blue-950/50 backdrop-blur-xs">
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
               <div>
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 text-red-700 font-extrabold flex items-center justify-center text-sm border border-slate-200">
-                      {trainer.name.charAt(0)}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="text-sm font-bold text-slate-900">
-                          {trainer.name}
-                        </h3>
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {trainer.trainer_code}
-                        </span>
-                      </div>
-                      <p className="text-xs text-red-700 font-medium">
-                        {trainer.specialization}
-                      </p>
-                      {isAdmin ? (
-                        <select
-                          value={trainer.department_id || ''}
-                          onChange={async (e) => {
-                            try {
-                              await db.updateTrainer(trainer.id, { department_id: e.target.value }, currentUser);
-                              reloadData();
-                            } catch (err: any) { alert(err.message); }
-                          }}
-                          className="mt-0.5 text-[10px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded px-1 py-0.5"
-                          title="Change department"
-                        >
-                          <option value="">Dept: Unassigned</option>
-                          {departments.map(d => <option key={d.id} value={d.id}>Dept: {d.name}</option>)}
-                        </select>
-                      ) : (
-                        <p className="text-[10px] font-semibold text-slate-500">Dept: {trainer.department_name || 'Unassigned'}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
-                    trainer.status === 'active' 
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                      : 'bg-slate-100 text-slate-500 border-slate-200'
-                  }`}>
-                    {trainer.status}
-                  </span>
-                </div>
-
-                {/* Contact details */}
-                <div className="space-y-1.5 mt-3 text-xs text-slate-600">
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{trainer.email}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="font-mono">{trainer.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Experience: {trainer.experience} · Joined: {trainer.joining_date}</span>
-                  </div>
-                </div>
-
-                {/* Skills badges */}
-                <div className="mt-3 pt-3 border-t border-slate-100">
-                  <span className="text-[10px] text-slate-400 font-semibold uppercase block mb-1.5">
-                    Technical Core Skills
-                  </span>
-                  <div className="flex flex-wrap gap-1">
-                    {trainer.skills.map((sk) => (
-                      <span key={sk} className="text-[10px] font-mono font-medium bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
-                        {sk}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                <h3 className="text-base font-bold text-white">Edit Trainer</h3>
+                <span className="text-xs text-blue-100 font-mono">{editingTrainer.trainer_code}</span>
               </div>
-
-              {/* Bottom footer with assigned count */}
-              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 text-slate-700">
-                  <Users className="w-4 h-4 text-slate-500" />
-                  <span className="font-bold text-slate-900">{assignedStudents.length}</span> Assigned Student(s)
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {isAdmin && (
-                    <button
-                      onClick={async () => {
-                        if (!window.confirm(`Delete trainer ${trainer.name} (${trainer.trainer_code})? Their login and class schedules will be removed.`)) return;
-                        try { await db.deleteTrainer(trainer.id); reloadData(); } catch (err: any) { alert(err.message); }
-                      }}
-                      title="Delete trainer"
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Delete
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setSelectedTrainerDetails(trainer)}
-                    className="text-xs font-semibold text-red-700 hover:underline"
-                  >
-                    View Assigned Roster &rarr;
-                  </button>
-                </div>
-              </div>
+              <button onClick={() => setEditingTrainer(null)} className="p-1 text-blue-100 hover:text-white" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          );
-        })}
-      </div>
+            <form onSubmit={handleEditSubmit} className="p-5 space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
+                <input required value={editingTrainer.name} onChange={(e) => setEditingTrainer({ ...editingTrainer, name: e.target.value })} className={fieldCls} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Email *</label>
+                  <input type="email" required value={editingTrainer.email} onChange={(e) => setEditingTrainer({ ...editingTrainer, email: e.target.value })} className={fieldCls} />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Phone *</label>
+                  <input required value={editingTrainer.phone} onChange={(e) => setEditingTrainer({ ...editingTrainer, phone: e.target.value })} className={fieldCls} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
+                  <select value={editingTrainer.department_id || ''} onChange={(e) => setEditingTrainer({ ...editingTrainer, department_id: e.target.value })} className={fieldCls}>
+                    <option value="">Unassigned</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Status</label>
+                  <select value={editingTrainer.status} onChange={(e) => setEditingTrainer({ ...editingTrainer, status: e.target.value as Trainer['status'] })} className={fieldCls}>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Specialization</label>
+                  <input value={editingTrainer.specialization} onChange={(e) => setEditingTrainer({ ...editingTrainer, specialization: e.target.value })} className={fieldCls} />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Experience</label>
+                  <input value={editingTrainer.experience} onChange={(e) => setEditingTrainer({ ...editingTrainer, experience: e.target.value })} className={fieldCls} />
+                </div>
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Skills (comma separated)</label>
+                <input value={editSkills} onChange={(e) => setEditSkills(e.target.value)} className={fieldCls} />
+              </div>
+              <div className="pt-2 flex justify-end gap-2 border-t">
+                <button type="button" onClick={() => setEditingTrainer(null)} className="px-3 py-1.5 text-slate-600 bg-slate-100 rounded hover:bg-slate-200">Cancel</button>
+                <button type="submit" className="px-4 py-1.5 text-white font-semibold bg-blue-600 hover:bg-blue-700 rounded">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* --- ASSIGNED STUDENTS ROSTER MODAL --- */}
       {selectedTrainerDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-blue-950/50 backdrop-blur-xs">
           <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-white">
                   Students Assigned to {selectedTrainerDetails.name}
                 </h3>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-blue-100">
                   {selectedTrainerDetails.specialization}
                 </span>
               </div>
               <button
                 onClick={() => setSelectedTrainerDetails(null)}
-                className="p-1 text-slate-400 hover:text-white"
+                className="p-1 text-blue-100 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -291,9 +301,9 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
 
       {/* --- ADD NEW TRAINER MODAL --- */}
       {showAddTrainerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-blue-950/50 backdrop-blur-xs">
           <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div className="px-5 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-white">
                   Onboard Faculty Trainer
@@ -301,7 +311,7 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
               </div>
               <button
                 onClick={() => setShowAddTrainerModal(false)}
-                className="p-1 text-slate-400 hover:text-white"
+                className="p-1 text-blue-100 hover:text-white"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -316,7 +326,7 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
                     placeholder="TRN-003"
                     value={newTrainerForm.trainer_code}
                     onChange={(e) => setNewTrainerForm({ ...newTrainerForm, trainer_code: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
                 <div>
@@ -326,7 +336,7 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
                     placeholder="e.g. 6+ Years"
                     value={newTrainerForm.experience}
                     onChange={(e) => setNewTrainerForm({ ...newTrainerForm, experience: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
               </div>
@@ -339,7 +349,7 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
                   placeholder="e.g. Suresh Kumar"
                   value={newTrainerForm.name}
                   onChange={(e) => setNewTrainerForm({ ...newTrainerForm, name: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -352,7 +362,7 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
                     placeholder="trainer@srikaraacademy.com"
                     value={newTrainerForm.email}
                     onChange={(e) => setNewTrainerForm({ ...newTrainerForm, email: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
                 <div>
@@ -363,7 +373,7 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
                     placeholder="+91 98403 12345"
                     value={newTrainerForm.phone}
                     onChange={(e) => setNewTrainerForm({ ...newTrainerForm, phone: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
               </div>
@@ -374,7 +384,7 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
                   required
                   value={newTrainerForm.department_id}
                   onChange={(e) => setNewTrainerForm({ ...newTrainerForm, department_id: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 >
                   <option value="">Select department…</option>
                   {departments.filter(d => d.status === 'active').map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -389,7 +399,7 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
                   placeholder="e.g. AI/ML Deep Learning or Full Stack Node/React"
                   value={newTrainerForm.specialization}
                   onChange={(e) => setNewTrainerForm({ ...newTrainerForm, specialization: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -400,7 +410,7 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
                   placeholder="Python, PyTorch, React, SQL"
                   value={newTrainerForm.skillsStr}
                   onChange={(e) => setNewTrainerForm({ ...newTrainerForm, skillsStr: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-red-600"
+                  className="w-full p-2 border border-slate-300 rounded outline-none focus:ring-1 focus:ring-blue-600"
                 />
               </div>
 
@@ -414,7 +424,7 @@ export const TrainersView: React.FC<TrainersViewProps> = ({ initialDepartmentId 
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-white font-semibold bg-red-700 hover:bg-red-800 rounded shadow-xs"
+                  className="px-4 py-1.5 text-white font-semibold bg-blue-700 hover:bg-blue-800 rounded shadow-xs"
                 >
                   Save Trainer
                 </button>

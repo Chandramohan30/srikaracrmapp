@@ -20,10 +20,10 @@ export async function verifyPassword(password: string, stored?: string): Promise
 }
 
 // ---------- Signed tokens (HMAC-SHA256) ----------
-// access  : short lived (15 min), sent as "Authorization: Bearer <token>"
+// access  : short lived (3 min), sent as "Authorization: Bearer <token>"
 // refresh : long lived (7 days), rotated on every use, stored HASHED in MongoDB
 // receipt : link token used in WhatsApp / e-mail messages to download one receipt
-export const ACCESS_TTL_MS = 15 * 60 * 1000;
+export const ACCESS_TTL_MS = 3 * 60 * 1000; // access token: 3 minutes (refresh token renews it silently)
 export const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const RECEIPT_LINK_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -38,22 +38,55 @@ function getSecret(): string {
 
 const b64 = (input: string | Buffer) => Buffer.from(input).toString('base64url');
 
+// Standard JWT (HS256): base64url(header).base64url(payload).base64url(HMAC-SHA256)
+// Claims: sub/uid, typ, iat & exp (seconds, per RFC 7519). Signed with AUTH_SECRET.
+const JWT_HEADER = b64(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+
+const hmac = (data: string) => crypto.createHmac('sha256', getSecret()).update(data).digest('base64url');
+
+function safeEqual(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
 function sign(typ: TokenType, claims: Record<string, any>, ttlMs: number): string {
-  const payload = b64(JSON.stringify({ ...claims, typ, exp: Date.now() + ttlMs }));
-  const sig = crypto.createHmac('sha256', getSecret()).update(payload).digest('base64url');
-  return `${payload}.${sig}`;
+  const now = Math.floor(Date.now() / 1000);
+  const payload = b64(JSON.stringify({
+    ...claims,
+    sub: claims.uid ?? claims.pid,
+    typ,
+    iat: now,
+    exp: now + Math.floor(ttlMs / 1000)
+  }));
+  const data = `${JWT_HEADER}.${payload}`;
+  return `${data}.${hmac(data)}`;
 }
 
 function verify(token: string, typ: TokenType): Record<string, any> | null {
   try {
-    const [payload, sig] = String(token).split('.');
-    if (!payload || !sig) return null;
-    const expected = crypto.createHmac('sha256', getSecret()).update(payload).digest('base64url');
-    const a = Buffer.from(sig);
-    const b = Buffer.from(expected);
-    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    if (data.typ !== typ || !data.exp || data.exp < Date.now()) return null;
+    const parts = String(token).split('.');
+    let data: any;
+
+    if (parts.length === 3) {
+      // JWT
+      const [header, payload, sig] = parts;
+      const h = JSON.parse(Buffer.from(header, 'base64url').toString('utf8'));
+      if (h.alg !== 'HS256') return null; // never accept "none" or other algs
+      if (!safeEqual(sig, hmac(`${header}.${payload}`))) return null;
+      data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+      if (!data.exp || data.exp * 1000 < Date.now()) return null;
+    } else if (parts.length === 2) {
+      // Legacy "payload.sig" token (exp in ms) - kept so receipt links already sent still open
+      const [payload, sig] = parts;
+      if (!safeEqual(sig, hmac(payload))) return null;
+      data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+      if (!data.exp || data.exp < Date.now()) return null;
+    } else {
+      return null;
+    }
+
+    if (data.typ !== typ) return null;
     return data;
   } catch {
     return null;

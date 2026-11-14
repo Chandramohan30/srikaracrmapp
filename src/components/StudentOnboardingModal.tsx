@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { 
   X, Check, ChevronRight, ChevronLeft, User, BookOpen, 
-  GraduationCap, CreditCard, Sparkles, AlertCircle
+  GraduationCap, CreditCard, Sparkles, AlertCircle, RotateCcw, CheckCircle2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Course, Trainer, Department } from '../types/crm';
-import { db, getMonthNamesFromDate, splitAmountIntoTwoInstallments } from '../services/db';
+import { db } from '../services/db';
+import { InstallmentPlanEditor } from './InstallmentPlanEditor';
+import { PlanRow, buildDefaultPlan, validatePlan as checkPlan, toPayload, rowTotalPaise } from '../lib/installmentPlan';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from './StatusBadges';
 
@@ -55,6 +57,10 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Installment plan: count from dropdown, each row editable (amount + due date)
+  const [installmentCount, setInstallmentCount] = useState<number>(2);
+  const [plan, setPlan] = useState<PlanRow[]>([]);
+
   // Load Courses and Trainers from Master
   React.useEffect(() => {
     if (isOpen) {
@@ -79,6 +85,16 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
     }
   }, [isOpen]);
 
+  // Re-split automatically whenever the count, course fee or joining date changes
+  const priceForPlan = (() => {
+    const dc = formData.department_id ? courses.filter(c => c.department_id === formData.department_id) : courses;
+    const c = dc.find(x => x.id === formData.course_id) || dc[0];
+    return c ? c.base_price : 0;
+  })();
+  React.useEffect(() => {
+    setPlan(buildDefaultPlan(installmentCount, priceForPlan, formData.joining_date));
+  }, [installmentCount, priceForPlan, formData.joining_date]);
+
   if (!isOpen) return null;
 
   // Only courses / trainers of the chosen department are offered
@@ -101,10 +117,10 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
   // Selected Trainer Object
   const selectedTrainer = deptTrainers.find(t => t.id === formData.trainer_id) || deptTrainers[0];
 
-  // Calculated 2 Installments for Step 4 & 5
-  const coursePrice = selectedCourse ? selectedCourse.base_price : 30000;
-  const [inst1, inst2] = splitAmountIntoTwoInstallments(coursePrice);
-  const months = getMonthNamesFromDate(formData.joining_date, 2);
+  // Installment plan for Step 4 & 5
+  const coursePrice = selectedCourse ? selectedCourse.base_price : 0;
+
+  const validatePlan = (): string | null => checkPlan(plan, coursePrice, formatCurrency);
 
   // Step Validation
   const validateStep = (step: number): boolean => {
@@ -145,6 +161,13 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
         return false;
       }
     }
+    if (step === 4) {
+      const planError = validatePlan();
+      if (planError) {
+        setFormError(planError);
+        return false;
+      }
+    }
     if (step === 3) {
       if (!formData.trainer_id) {
         setFormError(departments.length > 0 ? 'This department has no active trainer yet. Add one in Trainers first.' : 'Please assign a trainer.');
@@ -167,6 +190,12 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
 
   const handleConfirmAndOnboard = async () => {
     if (isSubmitting) return;
+    const planError = validatePlan();
+    if (planError) {
+      setFormError(planError);
+      setCurrentStep(4);
+      return;
+    }
     setIsSubmitting(true);
     try {
       const result = await db.onboardStudent({
@@ -186,7 +215,8 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
         department_id: formData.department_id || undefined,
         course_id: selectedCourse.id,
         trainer_id: selectedTrainer.id,
-        joining_date: formData.joining_date
+        joining_date: formData.joining_date,
+        installments: toPayload(plan)
       }, currentUser);
 
       try {
@@ -221,28 +251,28 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-blue-950/50 backdrop-blur-xs overflow-y-auto">
       <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="px-6 py-4 bg-gradient-to-r from-blue-800 to-blue-600 text-white flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-base font-bold text-white leading-tight">
               Student Onboarding Wizard
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-blue-100">
               5-Step Admissions and Automated Payment Setup
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-1.5 text-blue-100 hover:text-white hover:bg-white/15 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Step Progress Bar */}
-        <div className="px-6 py-3 bg-slate-100 border-b border-slate-200 shrink-0">
+        <div className="px-6 py-3 bg-blue-50/60 border-b border-slate-200 shrink-0">
           <div className="flex items-center justify-between">
             {stepsConfig.map((s, idx) => {
               const isPassed = currentStep > s.num;
@@ -254,7 +284,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                       isPassed
                         ? 'bg-emerald-600 text-white'
                         : isCurrent
-                        ? 'bg-red-700 text-white ring-2 ring-red-200'
+                        ? 'bg-blue-700 text-white ring-2 ring-blue-200'
                         : 'bg-slate-200 text-slate-600'
                     }`}>
                       {isPassed ? <Check className="w-3.5 h-3.5" /> : s.num}
@@ -303,7 +333,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     placeholder="e.g. Arun"
                     value={formData.first_name}
                     onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
 
@@ -317,7 +347,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     placeholder="e.g. Kumar"
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
 
@@ -331,7 +361,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     placeholder="student@example.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
 
@@ -345,7 +375,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     placeholder="+91 97890 12345"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
 
@@ -357,7 +387,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     <select
                       value={formData.gender}
                       onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                      className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                      className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                     >
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
@@ -367,7 +397,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                       type="date"
                       value={formData.date_of_birth}
                       onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                      className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                      className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                     />
                   </div>
                 </div>
@@ -379,7 +409,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                   <select
                     value={formData.qualification}
                     onChange={(e) => setFormData({ ...formData, qualification: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                   >
                     <option value="B.E Computer Science">B.E / B.Tech Computer Science</option>
                     <option value="B.Tech IT">B.Tech IT</option>
@@ -401,14 +431,14 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                       placeholder="e.g. PSG Tech / CIT"
                       value={formData.college}
                       onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                      className="col-span-2 p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                      className="col-span-2 p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                     />
                     <input
                       type="text"
                       placeholder="Year (2025)"
                       value={formData.passing_year}
                       onChange={(e) => setFormData({ ...formData, passing_year: e.target.value })}
-                      className="p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                      className="p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                     />
                   </div>
                 </div>
@@ -423,7 +453,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     placeholder="Door No, Street Name, Area"
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                   />
                 </div>
               </div>
@@ -447,7 +477,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                   <select
                     value={formData.department_id}
                     onChange={(e) => handleDepartmentChange(e.target.value)}
-                    className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600"
                   >
                     {departments.length === 0 && <option value="">No departments (add one in Departments)</option>}
                     {departments.map((d) => (
@@ -466,7 +496,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                   <select
                     value={formData.course_id}
                     onChange={(e) => setFormData({ ...formData, course_id: e.target.value })}
-                    className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600"
                   >
                     {deptCourses.length === 0 && <option value="">No courses in this department</option>}
                     {deptCourses.map((c) => (
@@ -485,7 +515,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-600 font-medium">Course Base Fee (From Master):</span>
-                      <span className="text-base font-extrabold text-red-700 tabular-nums">
+                      <span className="text-base font-extrabold text-blue-700 tabular-nums">
                         {formatCurrency(selectedCourse.base_price)}
                       </span>
                     </div>
@@ -504,10 +534,10 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     required
                     value={formData.joining_date}
                     onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
-                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-1 focus:ring-blue-600"
                   />
                   <span className="text-[10px] text-slate-500 mt-1 block">
-                    Installment months 1, 2, and 3 will automatically start from this joining month.
+                    Installment due dates start from this joining month (editable in Step 4).
                   </span>
                 </div>
               </div>
@@ -529,12 +559,12 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                   <select
                     value={formData.trainer_id}
                     onChange={(e) => setFormData({ ...formData, trainer_id: e.target.value })}
-                    className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-red-600"
+                    className="w-full p-2.5 border border-slate-300 rounded-lg font-semibold text-slate-900 outline-none focus:ring-1 focus:ring-blue-600"
                   >
                     {deptTrainers.length === 0 && <option value="">No trainers in this department</option>}
                     {deptTrainers.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.name} ({t.trainer_code}) — {t.specialization} [{t.experience}]
+                        {t.name} — {t.specialization} 
                       </option>
                     ))}
                   </select>
@@ -543,7 +573,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                 {selectedTrainer && (
                   <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
                     <div className="flex items-center gap-2">
-                      <GraduationCap className="w-5 h-5 text-red-700" />
+                      <GraduationCap className="w-5 h-5 text-blue-700" />
                       <div>
                         <div className="font-bold text-slate-900">{selectedTrainer.name}</div>
                         <div className="text-[11px] text-slate-500">{selectedTrainer.specialization}</div>
@@ -562,53 +592,20 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
             </div>
           )}
 
-          {/* STEP 4: Automated 3-Installment Generation Preview */}
+          {/* STEP 4: Installment plan (count, editable amounts/dates, sub-installments, manual) */}
           {currentStep === 4 && (
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 border-b pb-1">
-                Step 4: Automatic 2-Installment Plan Setup
+              <h3 className="text-sm font-bold text-slate-900 border-b border-blue-100 pb-1">
+                Step 4: Installment Plan Setup
               </h3>
-
-              
-
-              <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-100 font-semibold text-slate-700">
-                    <tr>
-                      <th className="p-3">Installment</th>
-                      <th className="p-3">Month</th>
-                      <th className="p-3">Due Date</th>
-                      <th className="p-3 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    <tr>
-                      <td className="p-3 font-semibold text-slate-900">Installment 1</td>
-                      <td className="p-3 text-slate-700">{months[0]?.month}</td>
-                      <td className="p-3 text-slate-500">{months[0]?.dueDate}</td>
-                      <td className="p-3 text-right font-bold text-slate-900 tabular-nums">
-                        {formatCurrency(inst1)}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="p-3 font-semibold text-slate-900">Installment 2</td>
-                      <td className="p-3 text-slate-700">{months[1]?.month}</td>
-                      <td className="p-3 text-slate-500">{months[1]?.dueDate}</td>
-                      <td className="p-3 text-right font-bold text-slate-900 tabular-nums">
-                        {formatCurrency(inst2)}
-                      </td>
-                    </tr>
-                    <tr className="bg-slate-50 font-bold border-t border-slate-200">
-                      <td colSpan={3} className="p-3 text-right text-slate-700">
-                        Total Course Fee:
-                      </td>
-                      <td className="p-3 text-right text-red-700 text-sm tabular-nums">
-                        {formatCurrency(inst1 + inst2)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <InstallmentPlanEditor
+                plan={plan}
+                onChange={setPlan}
+                fee={coursePrice}
+                count={installmentCount}
+                onCountChange={setInstallmentCount}
+                onReset={() => setPlan(buildDefaultPlan(installmentCount, coursePrice, formData.joining_date))}
+              />
             </div>
           )}
 
@@ -633,7 +630,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                     <span className="font-bold text-slate-900">
                       {selectedCourse.course_name}
                     </span>
-                    <span className="font-bold text-red-700 block">
+                    <span className="font-bold text-blue-700 block">
                       {formatCurrency(coursePrice)}
                     </span>
                   </div>
@@ -659,15 +656,29 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
                   <span className="text-slate-500 font-semibold block mb-1">
                     Generated Installment Plan:
                   </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="p-2 bg-white rounded border border-slate-200 text-center">
-                      <span className="text-[10px] text-slate-400 block font-bold">INST 1 ({months[0]?.month})</span>
-                      <span className="font-bold text-slate-900">{formatCurrency(inst1)}</span>
-                    </div>
-                    <div className="p-2 bg-white rounded border border-slate-200 text-center">
-                      <span className="text-[10px] text-slate-400 block font-bold">INST 2 ({months[1]?.month})</span>
-                      <span className="font-bold text-slate-900">{formatCurrency(inst2)}</span>
-                    </div>
+                  <div className="divide-y divide-blue-100 rounded border border-blue-100 bg-white">
+                    {plan.map((row, idx) => (
+                      <div key={idx} className="px-3 py-2">
+                        <div className="flex justify-between gap-2">
+                          <span className="font-bold text-slate-800">
+                            {row.kind === 'manual' ? `Manual Installment ${idx + 1}` : `Installment ${idx + 1}`}
+                            <span className="ml-1.5 font-normal text-slate-500">due {row.due_date}</span>
+                          </span>
+                          <span className="font-bold text-slate-900 tabular-nums">{formatCurrency(Number(row.amount) || 0)}</span>
+                        </div>
+                        {row.subs.map((sub, k) => (
+                          <div key={k} className="flex justify-between gap-2 pl-4 mt-1 text-slate-600">
+                            <span>↳ Installment {idx + 1}.{k + 1} <span className="text-slate-400">due {sub.due_date}</span></span>
+                            <span className="tabular-nums">{formatCurrency(Number(sub.amount) || 0)}</span>
+                          </div>
+                        ))}
+                        {row.subs.length > 0 && (
+                          <div className="text-right text-[10px] text-slate-400 mt-0.5">
+                            Installment {idx + 1} total {formatCurrency(rowTotalPaise(row) / 100)}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -703,7 +714,7 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
               <button
                 type="button"
                 onClick={handleNext}
-                className="flex items-center gap-1 px-4 py-1.5 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg shadow-xs transition-colors"
+                className="flex items-center gap-1 px-4 py-1.5 text-xs font-bold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-xs transition-colors"
               >
                 Next Step
                 <ChevronRight className="w-4 h-4" />
@@ -712,10 +723,11 @@ export const StudentOnboardingModal: React.FC<StudentOnboardingModalProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmAndOnboard}
-                className="flex items-center gap-1.5 px-5 py-2 text-xs font-extrabold text-white bg-red-700 hover:bg-red-800 rounded-lg shadow-sm transition-colors"
+                disabled={isSubmitting}
+                className="disabled:opacity-60 disabled:cursor-wait flex items-center gap-1.5 px-5 py-2 text-xs font-extrabold text-white bg-blue-700 hover:bg-blue-800 rounded-lg shadow-sm transition-colors"
               >
-                <Sparkles className="w-4 h-4 text-amber-300" />
-                Confirm & Onboard Student
+          
+                {isSubmitting ? 'Onboarding…' : 'Confirm & Onboard Student'}
               </button>
             )}
           </div>
