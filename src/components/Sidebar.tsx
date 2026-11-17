@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   LayoutDashboard, Users, BookOpen, GraduationCap, CreditCard, 
-  Settings, Clock, LogOut, Building2
+  Settings, Clock, LogOut, Building2, FileBarChart
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { SrikaraLogo } from './SrikaraLogo';
@@ -15,6 +15,7 @@ export type NavTab =
   | 'payments'
   | 'installments'
   | 'settings'
+  | 'reports' 
   | 'profile';
 
 interface SidebarProps {
@@ -45,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'trainers', label: 'Trainers', icon: GraduationCap },
         { id: 'payments', label: 'Payments', icon: CreditCard },
         { id: 'installments', label: 'Installments', icon: Clock, badge: duesCount > 0 ? `${duesCount} Dues` : undefined, badgeColor: 'bg-red-100 text-red-700 border-red-200' },
+        { id: 'reports', label: 'Department Report', icon: FileBarChart },
         { id: 'settings', label: 'Settings', icon: Settings },
       ];
     }

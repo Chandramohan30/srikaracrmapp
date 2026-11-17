@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1000" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Srikara CRM dashboard cover">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0F1216"/>
+      <stop offset="0.55" stop-color="#1E242B"/>
+      <stop offset="1" stop-color="#3A0D0D"/>
+    </linearGradient>
+    <radialGradient id="glowRed" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#B91C1C" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#B91C1C" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowGold" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#D97706" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#D97706" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#FFFFFF" fill-opacity="0.07"/>
+    </pattern>
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EF4444"/>
+      <stop offset="1" stop-color="#991B1B"/>
+    </linearGradient>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F59E0B" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#F59E0B" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <rect width="900" height="1000" fill="url(#bg)"/>
+  <rect width="900" height="1000" fill="url(#dots)"/>
+  <circle cx="760" cy="260" r="320" fill="url(#glowRed)"/>
+  <circle cx="120" cy="820" r="300" fill="url(#glowGold)"/>
+
+  <g fill="none" stroke="#FFFFFF" stroke-opacity="0.08">
+    <circle cx="450" cy="520" r="330"/>
+    <circle cx="450" cy="520" r="250" stroke-dasharray="4 10"/>
+    <circle cx="450" cy="520" r="410"/>
+  </g>
+
+  <g stroke="#D97706" stroke-opacity="0.5" stroke-width="1.5" stroke-dasharray="5 7" fill="none">
+    <path d="M170 410 C230 400 260 390 300 385"/>
+    <path d="M740 410 C700 400 670 395 640 390"/>
+    <path d="M200 690 C250 690 280 680 310 670"/>
+    <path d="M720 690 C680 690 650 680 610 670"/>
+  </g>
+  <!-- main dashboard window -->
+  <g filter="url(#shadow)">
+    <rect x="200" y="300" width="500" height="420" rx="22" fill="#FFFFFF"/>
+    <path d="M200 322 a22 22 0 0 1 22 -22 h456 a22 22 0 0 1 22 22 v26 h-500 z" fill="#1E242B"/>
+    <circle cx="228" cy="324" r="6" fill="#EF4444"/>
+    <circle cx="248" cy="324" r="6" fill="#F59E0B"/>
+    <circle cx="268" cy="324" r="6" fill="#22C55E"/>
+    <text x="292" y="329" font-family="sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">Srikara CRM · Dashboard</text>
+
+    <rect x="216" y="364" width="96" height="340" rx="12" fill="#F8FAFC"/>
+    <rect x="228" y="380" width="72" height="12" rx="6" fill="#B91C1C"/>
+    <g fill="#CBD5E1">
+      <rect x="228" y="404" width="58" height="9" rx="4.5"/>
+      <rect x="228" y="424" width="66" height="9" rx="4.5"/>
+      <rect x="228" y="444" width="52" height="9" rx="4.5"/>
+      <rect x="228" y="464" width="62" height="9" rx="4.5"/>
+      <rect x="228" y="484" width="48" height="9" rx="4.5"/>
+      <rect x="228" y="504" width="60" height="9" rx="4.5"/>
+    </g>
+
+    <rect x="326" y="364" width="112" height="70" rx="12" fill="#FEF2F2"/>
+    <text x="340" y="388" font-family="sans-serif" font-size="11" fill="#64748B">Students</text>
+    <text x="340" y="418" font-family="sans-serif" font-size="24" font-weight="800" fill="#1E242B">248</text>
+    <rect x="450" y="364" width="112" height="70" rx="12" fill="#FFFBEB"/>
+    <text x="464" y="388" font-family="sans-serif" font-size="11" fill="#64748B">Fees Collected</text>
+    <text x="464" y="418" font-family="sans-serif" font-size="24" font-weight="800" fill="#1E242B">₹8.4L</text>
+    <rect x="574" y="364" width="110" height="70" rx="12" fill="#F0FDF4"/>
+    <text x="588" y="388" font-family="sans-serif" font-size="11" fill="#64748B">Placed</text>
+    <text x="588" y="418" font-family="sans-serif" font-size="24" font-weight="800" fill="#1E242B">92%</text>
+
+    <rect x="326" y="448" width="236" height="256" rx="12" fill="#F8FAFC"/>
+    <text x="340" y="472" font-family="sans-serif" font-size="12" font-weight="700" fill="#1E242B">Monthly Admissions</text>
+    <g fill="url(#bar)">
+      <rect x="348" y="620" width="20" height="66" rx="5" opacity="0.55"/>
+      <rect x="380" y="588" width="20" height="98" rx="5" opacity="0.65"/>
+      <rect x="412" y="604" width="20" height="82" rx="5" opacity="0.75"/>
+      <rect x="444" y="556" width="20" height="130" rx="5" opacity="0.85"/>
+      <rect x="476" y="572" width="20" height="114" rx="5" opacity="0.92"/>
+      <rect x="508" y="520" width="20" height="166" rx="5"/>
+    </g>
+    <path d="M350 590 L390 556 L422 570 L454 520 L486 534 L518 490 L540 490 L540 686 L350 686 Z" fill="url(#area)"/>
+    <path d="M350 590 L390 556 L422 570 L454 520 L486 534 L518 490" fill="none" stroke="#D97706" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="518" cy="490" r="6" fill="#FFFFFF" stroke="#D97706" stroke-width="3"/>
+
+    <rect x="574" y="448" width="110" height="256" rx="12" fill="#F8FAFC"/>
+    <text x="588" y="472" font-family="sans-serif" font-size="12" font-weight="700" fill="#1E242B">Dues</text>
+    <circle cx="629" cy="540" r="36" fill="none" stroke="#FEE2E2" stroke-width="14"/>
+    <path d="M629 504 A36 36 0 1 1 594 549" fill="none" stroke="#B91C1C" stroke-width="14" stroke-linecap="round"/>
+    <text x="629" y="545" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="800" fill="#1E242B">76%</text>
+    <rect x="592" y="600" width="74" height="9" rx="4.5" fill="#CBD5E1"/>
+    <rect x="592" y="618" width="58" height="9" rx="4.5" fill="#CBD5E1"/>
+    <rect x="592" y="636" width="66" height="9" rx="4.5" fill="#FECACA"/>
+    <rect x="592" y="654" width="46" height="9" rx="4.5" fill="#FDE68A"/>
+  </g>
+  <!-- floating: student card -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="330" width="210" height="110" rx="18" fill="#FFFFFF"/>
+    <circle cx="88" cy="385" r="26" fill="#FEE2E2"/>
+    <circle cx="88" cy="377" r="10" fill="#B91C1C"/>
+    <path d="M70 402 C74 390 102 390 106 402" fill="#B91C1C"/>
+    <text x="126" y="372" font-family="sans-serif" font-size="13" font-weight="800" fill="#1E242B">New Admission</text>
+    <text x="126" y="391" font-family="sans-serif" font-size="10" fill="#64748B">SRK-2026-001</text>
+    <rect x="126" y="402" width="66" height="18" rx="9" fill="#DCFCE7"/>
+    <text x="159" y="415" text-anchor="middle" font-family="sans-serif" font-size="9" font-weight="700" fill="#15803D">ACTIVE</text>
+  </g>
+
+  <!-- floating: class schedule -->
+  <g filter="url(#shadow)">
+    <rect x="660" y="250" width="200" height="160" rx="18" fill="#FFFFFF"/>
+    <path d="M660 268 a18 18 0 0 1 18 -18 h164 a18 18 0 0 1 18 18 v22 h-200 z" fill="#B91C1C"/>
+    <text x="680" y="276" font-family="sans-serif" font-size="12" font-weight="800" fill="#FFFFFF">Class Schedule</text>
+    <g fill="#E2E8F0">
+      <rect x="680" y="306" width="22" height="22" rx="5"/>
+      <rect x="712" y="306" width="22" height="22" rx="5"/>
+      <rect x="744" y="306" width="22" height="22" rx="5" fill="#D97706"/>
+      <rect x="776" y="306" width="22" height="22" rx="5"/>
+      <rect x="808" y="306" width="22" height="22" rx="5"/>
+      <rect x="680" y="338" width="22" height="22" rx="5"/>
+      <rect x="712" y="338" width="22" height="22" rx="5" fill="#B91C1C"/>
+      <rect x="744" y="338" width="22" height="22" rx="5"/>
+      <rect x="776" y="338" width="22" height="22" rx="5"/>
+      <rect x="808" y="338" width="22" height="22" rx="5"/>
+      <rect x="680" y="370" width="22" height="22" rx="5"/>
+      <rect x="712" y="370" width="22" height="22" rx="5"/>
+      <rect x="744" y="370" width="22" height="22" rx="5"/>
+      <rect x="776" y="370" width="22" height="22" rx="5" fill="#1E242B"/>
+    </g>
+  </g>
+
+  <!-- floating: installments -->
+  <g filter="url(#shadow)">
+    <rect x="50" y="640" width="230" height="150" rx="18" fill="#FFFFFF"/>
+    <text x="70" y="670" font-family="sans-serif" font-size="13" font-weight="800" fill="#1E242B">Fee Installments</text>
+    <circle cx="78" cy="696" r="7" fill="#22C55E"/>
+    <rect x="94" y="691" width="110" height="10" rx="5" fill="#E2E8F0"/>
+    <text x="260" y="700" text-anchor="end" font-family="sans-serif" font-size="10" font-weight="700" fill="#15803D">Paid</text>
+    <circle cx="78" cy="724" r="7" fill="#22C55E"/>
+    <rect x="94" y="719" width="96" height="10" rx="5" fill="#E2E8F0"/>
+    <text x="260" y="728" text-anchor="end" font-family="sans-serif" font-size="10" font-weight="700" fill="#15803D">Paid</text>
+    <circle cx="78" cy="752" r="7" fill="#F59E0B"/>
+    <rect x="94" y="747" width="84" height="10" rx="5" fill="#E2E8F0"/>
+    <text x="260" y="756" text-anchor="end" font-family="sans-serif" font-size="10" font-weight="700" fill="#B45309">Due</text>
+  </g>
+
+  <!-- floating: placement badge -->
+  <g filter="url(#shadow)">
+    <rect x="620" y="640" width="240" height="120" rx="18" fill="#FFFFFF"/>
+    <circle cx="672" cy="700" r="30" fill="#FFFBEB" stroke="#D97706" stroke-width="3"/>
+    <path d="M672 680 L678 693 L692 694 L681 703 L685 717 L672 709 L659 717 L663 703 L652 694 L666 693 Z" fill="#D97706"/>
+    <text x="716" y="690" font-family="sans-serif" font-size="13" font-weight="800" fill="#1E242B">Placement Drive</text>
+    <text x="716" y="710" font-family="sans-serif" font-size="10" fill="#64748B">36 offers this month</text>
+    <rect x="716" y="722" width="120" height="8" rx="4" fill="#FEE2E2"/>
+    <rect x="716" y="722" width="90" height="8" rx="4" fill="#B91C1C"/>
+  </g>
+
+  <!-- notification pill -->
+  <g filter="url(#shadow)">
+    <rect x="330" y="215" width="240" height="48" rx="24" fill="#FFFFFF"/>
+    <circle cx="356" cy="239" r="14" fill="#B91C1C"/>
+    <path d="M350 239 L355 244 L363 234" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="380" y="235" font-family="sans-serif" font-size="11" font-weight="800" fill="#1E242B">Payment received</text>
+    <text x="380" y="251" font-family="sans-serif" font-size="10" fill="#64748B">₹12,500 · UPI · just now</text>
+  </g>
+
+  <!-- sparkles -->
+  <g fill="#F59E0B">
+    <path d="M150 230 l4 10 l10 4 l-10 4 l-4 10 l-4 -10 l-10 -4 l10 -4 z"/>
+    <path d="M800 560 l3 8 l8 3 l-8 3 l-3 8 l-3 -8 l-8 -3 l8 -3 z"/>
+    <path d="M460 820 l3 8 l8 3 l-8 3 l-3 8 l-3 -8 l-8 -3 l8 -3 z" fill="#EF4444"/>
+  </g>
+</svg>

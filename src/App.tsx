@@ -18,6 +18,8 @@ import { ChatBot } from './components/ChatBot';
 import { TopLoadingBar } from './components/TopLoadingBar';
 import { SrikaraLogo } from './components/SrikaraLogo';
 import { UserRole } from './types/crm';
+import { Departmentreportsview } from './views/Departmentreportsview';
+
 
 // Landing page for each role after sign-in / session restore
 const homeTabFor = (role: UserRole): NavTab => (role === 'student' ? 'profile' : 'dashboard');
@@ -123,6 +125,9 @@ const AppContent: React.FC = () => {
               />
             )}
 
+            { currentTab === 'reports' && <Departmentreportsview/>} 
+
+
             {currentTab === 'courses' && <CoursesView initialDepartmentId={departmentFilter} />}
 
             {currentTab === 'trainers' && <TrainersView initialDepartmentId={departmentFilter} />}
@@ -130,6 +135,8 @@ const AppContent: React.FC = () => {
             {currentTab === 'payments' && <PaymentsView />}
 
             {currentTab === 'installments' && <InstallmentsView />}
+
+          
 
             {currentTab === 'settings' && <SettingsView />}
 

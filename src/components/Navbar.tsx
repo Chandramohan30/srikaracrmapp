@@ -19,6 +19,7 @@ const tabTitles: Record<NavTab, { title: string; subtitle: string }> = {
   payments: { title: 'Payment Ledger', subtitle: 'All payments with receipts' },
   installments: { title: 'Installments & Dues Tracker', subtitle: 'Installment and sub-installment schedules with balance and overdue tracking' },
   settings: { title: 'System & Payment Settings', subtitle: 'Academy details, UPI collection settings and audit log' },
+  reports:  { title: 'Department Report', subtitle: 'Students, fees, payments and dues by department' },
   profile: { title: 'Student Profile', subtitle: 'Enrolled coursework, assigned trainer, and payment history' },
 };
 
